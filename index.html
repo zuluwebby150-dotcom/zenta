@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B4F3C">
+<link rel="manifest" href="manifest.json">
+<title>Zenta Business</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EDF1EE;--ink:#12211B;--mute:#5E6E66;--card:#fff;--g:#0B4F3C;--g2:#0F7B5C;--cu:#C4611F;--red:#B3261E;--line:#D9E0DB}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+body{font:16px/1.4 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:78px}
+h1,h2,h3,.big{font-family:'Bricolage Grotesque',Figtree,sans-serif}
+header{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 16px) 18px 22px}
+header small{opacity:.75}header h1{font-size:22px;font-weight:800}
+main{padding:14px 16px}
+.hero{background:var(--g);color:#fff;margin:-1px -16px 14px;padding:0 18px 22px}
+.hero .big{font-size:40px;font-weight:800}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border-radius:14px;padding:12px;border:1px solid var(--line)}
+.stat small{color:var(--mute)}.stat b{display:block;font:700 20px 'Bricolage Grotesque',sans-serif;margin-top:2px}
+.cu b{color:var(--cu)}
+h2{font-size:18px;margin:14px 0 8px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.row small{color:var(--mute);display:block}
+.amt{font-weight:600;white-space:nowrap}.neg{color:var(--red)}.cr{color:var(--cu)}
+button,.btn{font:600 16px Figtree,sans-serif;border:0;border-radius:12px;padding:12px 16px;background:var(--g2);color:#fff}
+button.sec{background:#fff;color:var(--g);border:1px solid var(--g)}
+button.sm{padding:7px 11px;font-size:14px}
+.fab{position:fixed;right:16px;bottom:88px;border-radius:26px;box-shadow:0 4px 14px #0004}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
+nav a{flex:1;text-align:center;padding:10px 0;font-size:12px;color:var(--mute)}
+nav a.on{color:var(--g);font-weight:600;box-shadow:inset 0 3px var(--g)}
+nav a i{display:block;font-style:normal;font-size:20px}
+input,select{width:100%;font:16px Figtree,sans-serif;padding:12px;border:1px solid var(--line);border-radius:10px;margin:4px 0 10px;background:#fff}
+label{font-size:14px;color:var(--mute)}
+#sheet{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;z-index:9}
+#sheet .in{background:#fff;width:100%;border-radius:20px 20px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom,0px) + 18px);max-height:90%;overflow:auto}
+#login{min-height:100vh;background:var(--g);color:#fff;padding:60px 24px}
+#login h1{font-size:38px;font-weight:800}#login p{opacity:.8;margin:6px 0 28px}
+#login button{width:100%;background:#fff;color:var(--g)}
+.empty{text-align:center;color:var(--mute);padding:26px 10px}
+#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:20px;display:none;z-index:20}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div id="login" style="display:none">
+  <h1>Zenta</h1><p>Run your business from your phone. Sign in with your phone number.</p>
+  <div id="step1"><label style="color:#fff">Phone number</label>
+    <input id="ph" type="tel" value="+260" inputmode="tel">
+    <button id="send">Send code</button></div>
+  <div id="step2" style="display:none"><label style="color:#fff">6-digit code</label>
+    <input id="code" inputmode="numeric" maxlength="6"><button id="verify">Sign in</button></div>
+  <div id="rc"></div>
+</div>
+<div id="app" style="display:none">
+  <header><small id="biz">Zenta Business</small><h1 id="ttl">Today</h1></header>
+  <main id="view"></main>
+  <nav id="nav"></nav>
+</div>
+<div id="sheet"><div class="in" id="sin"></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// ===== PASTE YOUR FIREBASE CONFIG HERE (Firebase Console > Project settings > Your apps > Web) =====
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDMraLmuAsI3Nm_IyE0tHD6sgTJLrjbjVA",
+  authDomain: "zenta-business.firebaseapp.com",
+  projectId: "zenta-business",
+  storageBucket: "zenta-business.firebasestorage.app",
+  messagingSenderId: "357741602171",
+  appId: "1:357741602171:web:0992c1b7dd2ff6577109de"
+};
+// ===================================================================================================
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth(), db = firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+const $ = id => document.getElementById(id);
+const K = n => 'K' + (Math.round((+n||0)*100)/100).toLocaleString();
+const esc = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const inc = firebase.firestore.FieldValue.increment;
+const toast = m => { const t=$('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2200); };
+const dstr = t => new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+const dayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); };
+
+let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[]}, tab='dash', unsubs=[];
+const col = n => db.collection('users').doc(uid).collection(n);
+
+// ---------- Auth ----------
+let confirmation;
+window.rv = new firebase.auth.RecaptchaVerifier('rc',{size:'invisible'});
+$('send').onclick = async () => {
+  try { confirmation = await auth.signInWithPhoneNumber($('ph').value.trim().replace(/\s/g,''), window.rv);
+    $('step1').style.display='none'; $('step2').style.display='block'; }
+  catch(e){ toast('Could not send code: '+e.code); }
+};
+$('verify').onclick = async () => {
+  try { await confirmation.confirm($('code').value.trim()); } catch(e){ toast('Wrong code. Try again.'); }
+};
+auth.onAuthStateChanged(u => {
+  unsubs.forEach(f=>f()); unsubs=[];
+  if(!u){ uid=null; $('app').style.display='none'; $('login').style.display='block'; return; }
+  uid=u.uid; $('login').style.display='none'; $('app').style.display='block';
+  Object.keys(S).forEach(n => unsubs.push(col(n).orderBy('t','desc').limit(500).onSnapshot(s => {
+    S[n]=s.docs.map(d=>({id:d.id,...d.data()})); render();
+  })));
+  buildNav(); render();
+});
+
+// ---------- Sheet (bottom form) ----------
+function sheet(title, fields, onSave, saveLabel='Save'){
+  $('sin').innerHTML = `<h2 style="margin-top:0">${title}</h2>` + fields.map(f =>
+    `<label>${f.label}</label>` + (f.opts
+      ? `<select id="f_${f.k}">${f.opts.map(o=>`<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select>`
+      : `<input id="f_${f.k}" type="${f.type||'text'}" ${f.type==='number'?'inputmode="decimal"':''} value="${esc(f.v??'')}">`)).join('') +
+    `<button id="ok" style="width:100%">${saveLabel}</button><button class="sec" id="no" style="width:100%;margin-top:8px">Cancel</button>`;
+  $('sheet').style.display='flex';
+  $('no').onclick = closeSheet;
+  $('ok').onclick = async () => {
+    const v={}; fields.forEach(f=>v[f.k]=$('f_'+f.k).value.trim());
+    try{ if(await onSave(v)!==false) closeSheet(); }catch(e){ toast('Error: '+e.message); }
+  };
+}
+const closeSheet = () => $('sheet').style.display='none';
+$('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
+
+// ---------- Actions ----------
+function addSale(){
+  sheet('New sale',[
+    {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
+    {k:'item',label:'Item name (if not from stock)'},
+    {k:'qty',label:'Quantity',type:'number',v:1},
+    {k:'price',label:'Price each (K)',type:'number'},
+    {k:'cid',label:'Customer',opts:[['','Walk-in customer'],...S.customers.map(c=>[c.id,c.name])]},
+    {k:'mode',label:'Payment',opts:[['cash','Paid now'],['credit','Nkongole (pay later)']]}
+  ], async v => {
+    const p=S.products.find(x=>x.id===v.pid), qty=+v.qty, price=+v.price||(p?p.price:0);
+    if(!qty||!price) return toast('Enter quantity and price'), false;
+    if(v.mode==='credit' && !v.cid) return toast('Choose a customer for Nkongole'), false;
+    if(p && qty>p.qty && !confirm(`Only ${p.qty} in stock. Continue?`)) return false;
+    const total=qty*price, c=S.customers.find(x=>x.id===v.cid);
+    const b=db.batch();
+    b.set(col('sales').doc(),{t:Date.now(),item:p?p.name:(v.item||'Sale'),qty,price,total,mode:v.mode,cid:v.cid||'',cname:c?c.name:''});
+    if(p) b.update(col('products').doc(p.id),{qty:inc(-qty)});
+    if(v.mode==='credit') b.update(col('customers').doc(v.cid),{owed:inc(total)});
+    await b.commit(); toast('Sale saved');
+  });
+}
+function addExpense(){
+  sheet('New expense',[{k:'what',label:'What was it for?'},{k:'amt',label:'Amount (K)',type:'number'}], async v=>{
+    if(!v.what||!+v.amt) return toast('Fill in both fields'), false;
+    await col('expenses').add({t:Date.now(),what:v.what,amt:+v.amt}); toast('Expense saved');
+  });
+}
+function addProduct(){
+  sheet('New product',[{k:'name',label:'Name'},{k:'qty',label:'Quantity in stock',type:'number',v:0},
+    {k:'cost',label:'Cost price (K)',type:'number'},{k:'price',label:'Selling price (K)',type:'number'}], async v=>{
+    if(!v.name) return toast('Enter a name'), false;
+    await col('products').add({t:Date.now(),name:v.name,qty:+v.qty||0,cost:+v.cost||0,price:+v.price||0}); toast('Product saved');
+  });
+}
+function restock(id){
+  const p=S.products.find(x=>x.id===id);
+  sheet('Add stock: '+esc(p.name),[{k:'n',label:'Quantity received',type:'number'}], async v=>{
+    if(!+v.n) return false; await col('products').doc(id).update({qty:inc(+v.n)}); toast('Stock updated');
+  });
+}
+function addCustomer(){
+  sheet('New customer',[{k:'name',label:'Name'},{k:'phone',label:'Phone',type:'tel'}], async v=>{
+    if(!v.name) return toast('Enter a name'), false;
+    await col('customers').add({t:Date.now(),name:v.name,phone:v.phone,owed:0}); toast('Customer saved');
+  });
+}
+function receive(id){
+  const c=S.customers.find(x=>x.id===id);
+  sheet(`Payment from ${esc(c.name)} (owes ${K(c.owed)})`,[{k:'amt',label:'Amount received (K)',type:'number'}], async v=>{
+    const a=+v.amt; if(!a||a>c.owed) return toast('Amount must be up to '+K(c.owed)), false;
+    const b=db.batch(); b.update(col('customers').doc(id),{owed:inc(-a)});
+    b.set(col('payments').doc(),{t:Date.now(),cid:id,cname:c.name,amt:a}); await b.commit(); toast('Payment recorded');
+  },'Record payment');
+}
+function del(name,id){ if(confirm('Delete this entry?')) col(name).doc(id).delete(); }
+window.A={addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>auth.signOut()};
+
+// ---------- Views ----------
+const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
+function buildNav(){ $('nav').innerHTML=tabs.map(t=>`<a href="#" data-t="${t[0]}"><i>${t[1]}</i>${t[2]}</a>`).join('');
+  $('nav').onclick=e=>{const a=e.target.closest('a'); if(a){e.preventDefault(); tab=a.dataset.t; render();}}; }
+const sum=(a,f)=>a.reduce((s,x)=>s+(+f(x)||0),0);
+const list=(a,fn,msg)=>a.length?a.map(fn).join(''):`<div class="empty">${msg}</div>`;
+const fab=(fn,label)=>`<button class="fab" onclick="A.${fn}()">+ ${label}</button>`;
+
+function render(){
+  if(!uid) return;
+  document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.t===tab));
+  const d0=dayStart(), tSales=S.sales.filter(s=>s.t>=d0), tExp=S.expenses.filter(e=>e.t>=d0);
+  const sales=sum(tSales,s=>s.total), exp=sum(tExp,e=>e.amt), owed=sum(S.customers,c=>c.owed), stockV=sum(S.products,p=>p.qty*p.cost);
+  const low=S.products.filter(p=>p.qty<=3);
+  const titles={dash:'Today',sales:'Sales',exp:'Expenses',stock:'Stock',cust:'Customers & Nkongole',more:'Cash flow & more'};
+  $('ttl').textContent=titles[tab]; let h='';
+  if(tab==='dash') h=`<div class="hero"><small style="opacity:.75">Today's sales</small><div class="big">${K(sales)}</div></div>
+    <div class="grid"><div class="stat"><small>Expenses</small><b>${K(exp)}</b></div>
+    <div class="stat"><small>Profit today</small><b>${K(sales-exp)}</b></div>
+    <div class="stat"><small>Stock value</small><b>${K(stockV)}</b></div>
+    <div class="stat cu"><small>Outstanding Nkongole</small><b>${K(owed)}</b></div></div>
+    ${low.length?`<h2>Running low</h2>`+low.map(p=>`<div class="row"><span>${esc(p.name)}</span><span class="amt neg">${p.qty} left</span></div>`).join(''):''}
+    <h2>Recent sales</h2>`+list(S.sales.slice(0,5),saleRow,'No sales yet. Tap Sales to record your first.');
+  if(tab==='sales') h=list(S.sales,saleRow,'No sales yet. Tap "+ Sale" to record one.')+fab('addSale','Sale');
+  if(tab==='exp') h=list(S.expenses,e=>`<div class="row"><div>${esc(e.what)}<small>${dstr(e.t)}</small></div><div><span class="amt neg">${K(e.amt)}</span> <button class="sec sm" onclick="A.del('expenses','${e.id}')">✕</button></div></div>`,'No expenses yet.')+fab('addExpense','Expense');
+  if(tab==='stock') h=list(S.products,p=>`<div class="row"><div>${esc(p.name)}<small>Cost ${K(p.cost)} · Sells ${K(p.price)}</small></div><div><span class="amt ${p.qty<=3?'neg':''}">${p.qty}</span> <button class="sec sm" onclick="A.restock('${p.id}')">+ Stock</button></div></div>`,'No products yet. Add what you sell.')+fab('addProduct','Product');
+  if(tab==='cust') h=list(S.customers,c=>`<div class="row"><div>${esc(c.name)}<small>${esc(c.phone||'')}</small></div><div><span class="amt ${c.owed>0?'cr':''}">${K(c.owed)}</span> ${c.owed>0?`<button class="sm" onclick="A.receive('${c.id}')">Paid</button>`:''}</div></div>`,'No customers yet.')+fab('addCustomer','Customer');
+  if(tab==='more'){ const cin=sum(S.sales.filter(s=>s.mode==='cash'),s=>s.total)+sum(S.payments,p=>p.amt), cout=sum(S.expenses,e=>e.amt);
+    h=`<div class="grid"><div class="stat"><small>Money in</small><b>${K(cin)}</b></div><div class="stat"><small>Money out</small><b>${K(cout)}</b></div>
+    <div class="stat"><small>Cash balance</small><b>${K(cin-cout)}</b></div><div class="stat"><small>All-time sales</small><b>${K(sum(S.sales,s=>s.total))}</b></div></div>
+    <p style="color:var(--mute);margin-bottom:14px">Money in = paid sales + Nkongole payments received. Invoices and detailed reports are coming next.</p>
+    <button class="sec" style="width:100%" onclick="A.out()">Sign out</button>`; }
+  $('view').innerHTML=h;
+}
+function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)}${s.mode==='credit'?' · <span class="cr">Nkongole: '+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
