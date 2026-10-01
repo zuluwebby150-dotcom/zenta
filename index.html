@@ -60,12 +60,19 @@ label{font-size:14px;color:var(--mute)}
   <main id="view"></main>
   <nav id="nav"></nav>
 </div>
+<div id="lock" style="display:none;position:fixed;inset:0;z-index:15;background:var(--g);color:#fff;padding:60px 24px;overflow:auto">
+  <h1 style="font-size:30px">Your free trial has ended</h1>
+  <p style="opacity:.85;margin:8px 0 18px">Your records are safe. Subscribe to keep using Zenta.</p>
+  <div class="stat" style="color:var(--ink);margin-bottom:14px"><small>Zenta Business</small><b>K100 per month</b>
+  <p style="margin-top:8px">Send K100 to:<br>MTN Money: <b id="mtn" style="display:inline"></b><br>Airtel Money: <b id="air" style="display:inline"></b></p>
+  <p style="margin-top:8px">Use this as the payment reference: <b id="ref" style="display:inline"></b><br><small>We activate your account after your payment arrives.</small></p></div>
+  <button class="sec" onclick="A.out()" style="width:100%">Sign out</button></div>
 <div id="sheet"><div class="in" id="sin"></div></div>
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,RecaptchaVerifier,signInWithPhoneNumber,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // ===== PASTE YOUR FIREBASE CONFIG HERE (Firebase Console > Project settings > Your apps > Web) =====
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDMraLmuAsI3Nm_IyE0tHD6sgTJLrjbjVA",
@@ -76,6 +83,8 @@ const FIREBASE_CONFIG = {
   appId: "1:357741602171:web:0992c1b7dd2ff6577109de"
 };
 // ===================================================================================================
+const TRIAL_DAYS = 15, PRICE = 100;
+const PAY_MTN = "0XXX XXX XXX", PAY_AIRTEL = "0XXX XXX XXX";   // <-- put your real numbers here
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})},'default');
@@ -89,10 +98,23 @@ const dayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d.getTi
 
 let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[]}, tab='dash', unsubs=[];
 const sb = m => $('biz').textContent = m;
-async function cloudCheck(){
-  try{ await Promise.race([setDoc(docRef('meta','ping'),{t:Date.now()}), new Promise((_,r)=>setTimeout(()=>r({code:'no connection to the database (timeout)'}),8000))]);
-    sb('Cloud sync OK'); }catch(e){ sb('NOT SAVING TO CLOUD: '+(e.code||e.message)); }
-}
+let acct=null, per='today';
+function watchAcct(){ unsubs.push(onSnapshot(docRef('meta','account'), s=>{
+  if(!s.exists()){ setDoc(docRef('meta','account'),{start:serverTimestamp()}).catch(e=>sb('NOT SAVING TO CLOUD: '+e.code)); return; }
+  acct=s.data(); render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
+function access(){ if(!acct) return {ok:true,left:TRIAL_DAYS,paid:false};
+  const now=Date.now(), st=acct.start?acct.start.toMillis():now, pu=acct.paidUntil?acct.paidUntil.toMillis():0;
+  if(now<pu) return {ok:true,paid:true,left:Math.ceil((pu-now)/864e5)};
+  const left=Math.ceil((st+TRIAL_DAYS*864e5-now)/864e5); return {ok:left>0,paid:false,left:Math.max(left,0)}; }
+const PER=[['today','Today'],['yesterday','Yesterday'],['week','This week'],['month','This month'],['last','Last month']];
+const ML={cash:'Cash',mtn:'MTN Money',airtel:'Airtel Money',bank:'Bank',credit:'Nkongole'};
+function range(){ const d=new Date(); d.setHours(0,0,0,0); const t=d.getTime(), D=864e5;
+  if(per==='today') return [t,Infinity]; if(per==='yesterday') return [t-D,t];
+  if(per==='week') return [t-((d.getDay()+6)%7)*D,Infinity];
+  const m=new Date(d.getFullYear(),d.getMonth(),1).getTime();
+  return per==='month'?[m,Infinity]:[new Date(d.getFullYear(),d.getMonth()-1,1).getTime(),m]; }
+const inR = x => { const [a,b]=range(); return x.t>=a && x.t<b; };
+const perSel = () => `<select onchange="A.per(this.value)">${PER.map(p=>`<option value="${p[0]}" ${p[0]===per?'selected':''}>${p[1]}</option>`).join('')}</select>`;
 const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
@@ -114,7 +136,7 @@ onAuthStateChanged(auth, u => {
   Object.keys(S).forEach(n => unsubs.push(onSnapshot(query(col(n),orderBy('t','desc'),limit(500)), s => {
     S[n]=s.docs.map(d=>({id:d.id,...d.data()})); render();
   }, e => sb('NOT SAVING TO CLOUD: '+e.code))));
-  cloudCheck();
+  watchAcct();
   buildNav(); render();
 });
 
@@ -143,7 +165,7 @@ function addSale(){
     {k:'qty',label:'Quantity',type:'number',v:1},
     {k:'price',label:'Price each (K)',type:'number'},
     {k:'cid',label:'Customer',opts:[['','Walk-in customer'],...S.customers.map(c=>[c.id,c.name])]},
-    {k:'mode',label:'Payment',opts:[['cash','Paid now'],['credit','Nkongole (pay later)']]}
+    {k:'mode',label:'Payment',opts:[['cash','Cash'],['mtn','MTN Money'],['airtel','Airtel Money'],['bank','Bank'],['credit','Nkongole (pay later)']]}
   ], async v => {
     const p=S.products.find(x=>x.id===v.pid), qty=+v.qty, price=+v.price||(p?p.price:0);
     if(!qty||!price) return toast('Enter quantity and price'), false;
@@ -191,7 +213,7 @@ function receive(id){
   },'Record payment');
 }
 function del(name,id){ if(confirm('Delete this entry?')) deleteDoc(docRef(name,id)); }
-window.A={addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
@@ -203,32 +225,38 @@ const fab=(fn,label)=>`<button class="fab" onclick="A.${fn}()">+ ${label}</butto
 
 function render(){
   if(!uid) return;
+  const ac=access(); $('lock').style.display=ac.ok?'none':'block'; $('ref').textContent=auth.currentUser?auth.currentUser.phoneNumber:'';
+  if(ac.ok) sb(ac.paid?`Subscribed · ${ac.left} days left`:`Free trial · ${ac.left} days left`);
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.t===tab));
-  const d0=dayStart(), tSales=S.sales.filter(s=>s.t>=d0), tExp=S.expenses.filter(e=>e.t>=d0);
+  const tSales=S.sales.filter(inR), tExp=S.expenses.filter(inR), pl=PER.find(p=>p[0]===per)[1];
   const sales=sum(tSales,s=>s.total), exp=sum(tExp,e=>e.amt), owed=sum(S.customers,c=>c.owed), stockV=sum(S.products,p=>p.qty*p.cost);
   const low=S.products.filter(p=>p.qty<=3);
   const titles={dash:'Today',sales:'Sales',exp:'Expenses',stock:'Stock',cust:'Customers & Nkongole',more:'Cash flow & more'};
   $('ttl').textContent=titles[tab]; let h='';
-  if(tab==='dash') h=`<div class="hero"><small style="opacity:.75">Today's sales</small><div class="big">${K(sales)}</div></div>
-    <div class="grid"><div class="stat"><small>Expenses</small><b>${K(exp)}</b></div>
-    <div class="stat"><small>Profit today</small><b>${K(sales-exp)}</b></div>
+  if(tab==='dash') h=`<div class="hero"><small style="opacity:.75">Sales · ${pl}</small><div class="big">${K(sales)}</div></div>
+    <div>${perSel()}</div><div class="grid"><div class="stat"><small>Expenses</small><b>${K(exp)}</b></div>
+    <div class="stat"><small>Profit (sales − expenses)</small><b>${K(sales-exp)}</b></div>
     <div class="stat"><small>Stock value</small><b>${K(stockV)}</b></div>
     <div class="stat cu"><small>Outstanding Nkongole</small><b>${K(owed)}</b></div></div>
     ${low.length?`<h2>Running low</h2>`+low.map(p=>`<div class="row"><span>${esc(p.name)}</span><span class="amt neg">${p.qty} left</span></div>`).join(''):''}
     <h2>Recent sales</h2>`+list(S.sales.slice(0,5),saleRow,'No sales yet. Tap Sales to record your first.');
-  if(tab==='sales') h=list(S.sales,saleRow,'No sales yet. Tap "+ Sale" to record one.')+fab('addSale','Sale');
-  if(tab==='exp') h=list(S.expenses,e=>`<div class="row"><div>${esc(e.what)}<small>${dstr(e.t)}</small></div><div><span class="amt neg">${K(e.amt)}</span> <button class="sec sm" onclick="A.del('expenses','${e.id}')">✕</button></div></div>`,'No expenses yet.')+fab('addExpense','Expense');
+  if(tab==='sales') h=perSel()+list(tSales,saleRow,'No sales in this period.')+fab('addSale','Sale');
+  if(tab==='exp') h=perSel()+list(tExp,e=>`<div class="row"><div>${esc(e.what)}<small>${dstr(e.t)}</small></div><div><span class="amt neg">${K(e.amt)}</span> <button class="sec sm" onclick="A.del('expenses','${e.id}')">✕</button></div></div>`,'No expenses yet.')+fab('addExpense','Expense');
   if(tab==='stock') h=list(S.products,p=>`<div class="row"><div>${esc(p.name)}<small>Cost ${K(p.cost)} · Sells ${K(p.price)}</small></div><div><span class="amt ${p.qty<=3?'neg':''}">${p.qty}</span> <button class="sec sm" onclick="A.restock('${p.id}')">+ Stock</button></div></div>`,'No products yet. Add what you sell.')+fab('addProduct','Product');
   if(tab==='cust') h=list(S.customers,c=>`<div class="row"><div>${esc(c.name)}<small>${esc(c.phone||'')}</small></div><div><span class="amt ${c.owed>0?'cr':''}">${K(c.owed)}</span> ${c.owed>0?`<button class="sm" onclick="A.receive('${c.id}')">Paid</button>`:''}</div></div>`,'No customers yet.')+fab('addCustomer','Customer');
-  if(tab==='more'){ const cin=sum(S.sales.filter(s=>s.mode==='cash'),s=>s.total)+sum(S.payments,p=>p.amt), cout=sum(S.expenses,e=>e.amt);
-    h=`<div class="grid"><div class="stat"><small>Money in</small><b>${K(cin)}</b></div><div class="stat"><small>Money out</small><b>${K(cout)}</b></div>
-    <div class="stat"><small>Cash balance</small><b>${K(cin-cout)}</b></div><div class="stat"><small>All-time sales</small><b>${K(sum(S.sales,s=>s.total))}</b></div></div>
-    <p style="color:var(--mute);margin-bottom:14px">Money in = paid sales + Nkongole payments received. Invoices and detailed reports are coming next.</p>
+  if(tab==='more'){ const by={}, prod={}; tSales.forEach(x=>{by[x.mode||'cash']=(by[x.mode||'cash']||0)+x.total; prod[x.item]=(prod[x.item]||0)+x.total;});
+    const cin=sum(tSales.filter(x=>x.mode!=='credit'),x=>x.total)+sum(S.payments.filter(inR),x=>x.amt);
+    const rows=o=>Object.entries(o).sort((p,q)=>q[1]-p[1]).slice(0,6).map(([k,v])=>`<div class="row"><span>${esc(ML[k]||k)}</span><span class="amt">${K(v)}</span></div>`).join('')||'<div class="empty">Nothing yet.</div>';
+    h=`${perSel()}<div class="grid"><div class="stat"><small>Sales</small><b>${K(sales)}</b></div><div class="stat"><small>Expenses</small><b>${K(exp)}</b></div>
+    <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
+    <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
+    <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
     <button class="sec" style="width:100%" onclick="A.out()">Sign out</button>`; }
   $('view').innerHTML=h;
 }
-function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)}${s.mode==='credit'?' · <span class="cr">Nkongole: '+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
+function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
 
+$('mtn').textContent=PAY_MTN; $('air').textContent=PAY_AIRTEL;
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
