@@ -73,7 +73,7 @@ label{font-size:14px;color:var(--mute)}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,RecaptchaVerifier,signInWithPhoneNumber,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,increment,serverTimestamp,collectionGroup,getDocs,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // ===== PASTE YOUR FIREBASE CONFIG HERE (Firebase Console > Project settings > Your apps > Web) =====
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDMraLmuAsI3Nm_IyE0tHD6sgTJLrjbjVA",
@@ -83,9 +83,10 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "357741602171",
   appId: "1:357741602171:web:0992c1b7dd2ff6577109de"
 };
-// ===================================================================================================
+  // ===================================================================================================
 const TRIAL_DAYS = 15, PRICE = 100;
 const PAY_MTN = "0XXX XXX XXX", PAY_AIRTEL = "0XXX XXX XXX";   // <-- put your real numbers here
+const ADMIN_PHONE = "+260971234567";   // the sign-in number that can open the Admin screen
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})},'default');
@@ -102,7 +103,7 @@ const sb = m => $('biz').textContent = m;
 let acct=null, per='today';
 function watchAcct(){ unsubs.push(onSnapshot(docRef('meta','account'), s=>{
   if(!s.exists()){ setDoc(docRef('meta','account'),{start:serverTimestamp()}).catch(e=>sb('NOT SAVING TO CLOUD: '+e.code)); return; }
-  acct=s.data(); render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
+  acct=s.data(); if(!acct.phone && auth.currentUser && auth.currentUser.phoneNumber) updateDoc(docRef('meta','account'),{phone:auth.currentUser.phoneNumber}).catch(()=>{}); render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
 function access(){ if(!acct) return {ok:true,left:TRIAL_DAYS,paid:false};
   const now=Date.now(), st=acct.start?acct.start.toMillis():now, pu=acct.paidUntil?acct.paidUntil.toMillis():0;
   if(now<pu) return {ok:true,paid:true,left:Math.ceil((pu-now)/864e5)};
@@ -120,7 +121,7 @@ const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
-let confirmation;
+  let confirmation;
 window.rv = new RecaptchaVerifier(auth,'rc',{size:'invisible'});
 $('send').onclick = async () => {
   try { confirmation = await signInWithPhoneNumber(auth, $('ph').value.trim().replace(/\s/g,''), window.rv);
@@ -155,11 +156,28 @@ function sheet(title, fields, onSave, saveLabel='Save'){
     try{ if(await onSave(v)!==false) closeSheet(); }catch(e){ toast('Error: '+e.message); }
   };
 }
+const isAdmin = () => auth.currentUser && auth.currentUser.phoneNumber === ADMIN_PHONE;
+let ADM = {};
+async function admin(){
+  $('sin').innerHTML='<h2 style="margin-top:0">Subscribers</h2><p>Loading…</p>'; $('sheet').style.display='flex';
+  try{ const q=await getDocs(collectionGroup(db,'meta')), now=Date.now(), rows=[]; ADM={};
+    q.forEach(d=>{ if(d.id!=='account') return; const a=d.data(), uid=d.ref.parent.parent.id,
+      st=a.start?a.start.toMillis():now, pu=a.paidUntil?a.paidUntil.toMillis():0, tl=Math.ceil((st+TRIAL_DAYS*864e5-now)/864e5);
+      const k=now<pu?'paid':tl>0?'trial':'expired'; ADM[uid]=pu;
+      rows.push({uid,k,phone:a.phone||uid.slice(0,8),txt:k==='paid'?`Paid · ${Math.ceil((pu-now)/864e5)} days left`:k==='trial'?`Trial · ${tl} days left`:'Expired'}); });
+    const n=k=>rows.filter(r=>r.k===k).length;
+    $('sin').innerHTML=`<h2 style="margin-top:0">Subscribers (${rows.length})</h2><p style="color:var(--mute);margin-bottom:10px">Paid ${n('paid')} · Trial ${n('trial')} · Expired ${n('expired')} · Monthly income about K${n('paid')*PRICE}</p>`+
+      (rows.map(r=>`<div class="row"><div>${esc(r.phone)}<small class="${r.k==='expired'?'neg':''}">${r.txt}</small></div><button class="sm" onclick="A.extend('${r.uid}')">+30 days</button></div>`).join('')||'<div class="empty">No subscribers yet.</div>')+
+      '<button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>';
+  }catch(e){ $('sin').innerHTML='<h2>Subscribers</h2><p>Could not load: '+esc(e.code||e.message)+'</p><button class="sec" style="width:100%" onclick="A.close()">Close</button>'; }
+}
+async function extend(uid){ if(!confirm('Add 30 days for this subscriber?')) return;
+  try{ await updateDoc(doc(db,'users',uid,'meta','account'),{paidUntil:Timestamp.fromMillis(Math.max(Date.now(),ADM[uid]||0)+30*864e5)}); toast('Activated'); admin(); }catch(e){ toast('Error: '+e.code); } }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
 // ---------- Actions ----------
-function addSale(){
+  function addSale(){
   sheet('New sale',[
     {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
     {k:'item',label:'Item name (if not from stock)'},
@@ -214,10 +232,10 @@ function receive(id){
   },'Record payment');
 }
 function del(name,id){ if(confirm('Delete this entry?')) deleteDoc(docRef(name,id)); }
-window.A={per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
-const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
+  const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
 function buildNav(){ $('nav').innerHTML=tabs.map(t=>`<a href="#" data-t="${t[0]}"><i>${t[1]}</i>${t[2]}</a>`).join('');
   $('nav').onclick=e=>{const a=e.target.closest('a'); if(a){e.preventDefault(); tab=a.dataset.t; render();}}; }
 const sum=(a,f)=>a.reduce((s,x)=>s+(+f(x)||0),0);
@@ -252,7 +270,7 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    <button class="sec" style="width:100%" onclick="A.out()">Sign out</button>`; }
+    ${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button>`; }
   $('view').innerHTML=h;
 }
 function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
