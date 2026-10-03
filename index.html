@@ -129,7 +129,7 @@ const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
-  const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
+const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
 $('send').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
 $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,''); if(!/^\+260\d{9}$/.test(ph)) return toast('Phone must look like +260764173141');
   try{ localStorage.setItem('zenta_phone',ph); await createUserWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
@@ -144,7 +144,7 @@ onAuthStateChanged(auth, u => {
   buildNav(); render();
 });
 
-// ---------- Sheet (bottom form) ----------
+  // ---------- Sheet (bottom form) ----------
 function sheet(title, fields, onSave, saveLabel='Save'){
   $('sin').innerHTML = `<h2 style="margin-top:0">${title}</h2>` + fields.map(f =>
     `<label>${f.label}</label>` + (f.opts
@@ -254,11 +254,23 @@ function receipt(id){ const s=S.sales.find(x=>x.id===id); if(!s) return;
     $('sheet').style.display='flex'; $('cp').onclick=()=>{ if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>toast('Copied')); }; };
   if(bizName) go(); else sheet('Business name',[{k:'n',label:'Your shop name (shown on receipts)'}], async v=>{
     if(!v.n) return toast('Enter a name'), false; await setDoc(docRef('private','settings'),{biz:v.n},{merge:true}); bizName=v.n; setTimeout(go,50); }); }
+const csvText = rows => '\ufeff'+rows.map(r=>r.map(c=>{ c=String(c??''); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c; }).join(',')).join('\n');
+function showExport(){ const pl=PER.find(p=>p[0]===per)[1];
+  $('sin').innerHTML='<h2 style="margin-top:0">Export to Excel</h2><p style="color:var(--mute);margin-bottom:12px">Sales and expenses use the period selected on this screen: <b>'+pl+'</b>.</p><button style="width:100%;margin-bottom:8px" onclick="A.csv(\'sales\')">Sales</button><button style="width:100%;margin-bottom:8px" onclick="A.csv(\'expenses\')">Expenses</button><button style="width:100%;margin-bottom:8px" onclick="A.csv(\'stock\')">Stock list (now)</button><button class="sec" style="width:100%" onclick="A.close()">Close</button>';
+  $('sheet').style.display='flex'; }
+async function exportCsv(kind){
+  const d=t=>new Date(t).toLocaleString('en-GB'); let rows;
+  if(kind==='sales') rows=[['Date','Item','Quantity','Price','Total','Payment','Customer'],...S.sales.filter(inR).map(x=>[d(x.t),x.item,x.qty,x.price,x.total,ML[x.mode]||'Cash',x.cname||''])];
+  else if(kind==='expenses') rows=[['Date','What for','Amount'],...S.expenses.filter(inR).map(x=>[d(x.t),x.what,x.amt])];
+  else rows=[['Product','Quantity','Cost price','Selling price','Stock value'],...S.products.map(p=>[p.name,p.qty,p.cost,p.price,p.qty*p.cost])];
+  const file=new File([csvText(rows)],'zenta-'+kind+(kind==='stock'?'':'-'+per)+'.csv',{type:'text/csv'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:file.name}); return; }catch(e){ if(e.name==='AbortError') return; } }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); toast('Saved to Downloads'); }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
 // ---------- Actions ----------
-function addSale(){
+  function addSale(){
   sheet('New sale',[
     {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
     {k:'item',label:'Item name (if not from stock)'},
@@ -289,9 +301,8 @@ function addExpense(){
     if(!v.what||!+v.amt) return toast('Fill in both fields'), false;
     await addDoc(col('expenses'),{t:Date.now(),what:v.what,amt:+v.amt}); toast('Expense saved');
   });
-                                                                               
 }
-  function addProduct(){
+function addProduct(){
   sheet('New product',[{k:'name',label:'Name'},{k:'qty',label:'Quantity in stock',type:'number',v:0},
     {k:'cost',label:'Cost price (K)',type:'number'},{k:'price',label:'Selling price (K)',type:'number'}], async v=>{
     if(!v.name) return toast('Enter a name'), false;
@@ -319,7 +330,7 @@ function receive(id){
   },'Record payment');
 }
 function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
-window.A={receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
@@ -358,7 +369,7 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
+    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.exportMenu()">Export to Excel (CSV)</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
 function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.receipt('${s.id}')">🧾</button> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
