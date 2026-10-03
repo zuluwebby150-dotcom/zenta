@@ -68,6 +68,10 @@ label{font-size:14px;color:var(--mute)}
   <p style="margin-top:8px">Send K100 to:<br>MTN Money: <b id="mtn" style="display:inline"></b><br>Airtel Money: <b id="air" style="display:inline"></b></p>
   <p style="margin-top:8px">Use this as the payment reference: <b id="ref" style="display:inline"></b><br><small>We activate your account after your payment arrives.</small></p></div>
   <button class="sec" onclick="A.out()" style="width:100%">Sign out</button></div>
+<div id="pinlock" style="display:none;position:fixed;inset:0;z-index:30;background:var(--g);color:#fff;padding:90px 24px;text-align:center">
+  <h1 style="font-size:30px">Enter your PIN</h1><p style="opacity:.8;margin:6px 0 20px">4-digit PIN</p>
+  <input id="pinin" type="password" inputmode="numeric" maxlength="4" style="text-align:center;font-size:30px;letter-spacing:14px;max-width:220px">
+  <p id="pinmsg" style="min-height:24px"></p><p style="margin-top:20px"><a href="#" id="pinforgot" style="color:#fff">Forgot PIN? Sign out</a></p></div>
 <div id="sheet"><div class="in" id="sin"></div></div>
 
 <script type="module">
@@ -100,10 +104,10 @@ const dayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d.getTi
 
 let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[]}, tab='dash', unsubs=[];
 const sb = m => $('biz').textContent = m;
-let acct=null, per='today', started=false, dataUnsubs=[];
+let acct=null, per='today', started=false, dataUnsubs=[], D={sales:[],expenses:[]};
 function startData(){ if(started) return; started=true; dataUnsubs.forEach(f=>f()); dataUnsubs=[];
   Object.keys(S).forEach(n => dataUnsubs.push(onSnapshot(query(col(n),orderBy('t','desc'),limit(500)), s => {
-    S[n]=s.docs.map(d=>({id:d.id,...d.data()})); render();
+    const all=s.docs.map(d=>({id:d.id,...d.data()})); S[n]=all.filter(x=>!x.deleted); D[n]=all.filter(x=>x.deleted); render();
   }, e => { started=false; if(access().ok) sb('NOT SAVING TO CLOUD: '+e.code); }))); }
 function watchAcct(){ unsubs.push(onSnapshot(docRef('meta','account'), s=>{
   if(!s.exists()){ setDoc(docRef('meta','account'),{start:serverTimestamp(),phone:localStorage.getItem('zenta_phone')||'',email:(auth.currentUser&&auth.currentUser.email)||''}).catch(e=>sb('NOT SAVING TO CLOUD: '+e.code)); return; }
@@ -125,20 +129,22 @@ const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
-const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
-$('send').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
+  const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
+$('send').onclick = async () => { try{ const c=await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); localStorage.removeItem('zenta_owner_'+c.user.uid); }catch(e){ toast(authErr(e)); } };
 $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,''); if(!/^\+260\d{9}$/.test(ph)) return toast('Phone must look like +260764173141');
   try{ localStorage.setItem('zenta_phone',ph); await createUserWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
 $('forgot').onclick = async e => { e.preventDefault(); const m=$('em').value.trim(); if(!m) return toast('Type your email first');
   try{ await sendPasswordResetEmail(auth,m); toast('Reset link sent. Check your email'); }catch(x){ toast(authErr(x)); } };
 onAuthStateChanged(auth, u => {
+  unlocked=false; bad=0;
   unsubs.forEach(f=>f()); unsubs=[]; dataUnsubs.forEach(f=>f()); dataUnsubs=[]; started=false; acct=null;
   if(!u){ uid=null; $('app').style.display='none'; $('login').style.display='block'; return; }
   uid=u.uid; $('login').style.display='none'; $('app').style.display='block';
   watchAcct();
   buildNav(); render();
 });
-  // ---------- Sheet (bottom form) ----------
+
+// ---------- Sheet (bottom form) ----------
 function sheet(title, fields, onSave, saveLabel='Save'){
   $('sin').innerHTML = `<h2 style="margin-top:0">${title}</h2>` + fields.map(f =>
     `<label>${f.label}</label>` + (f.opts
@@ -169,6 +175,39 @@ async function admin(){
 }
 async function extend(uid){ if(!confirm('Add 30 days for this subscriber?')) return;
   try{ await updateDoc(doc(db,'users',uid,'meta','account'),{paidUntil:Timestamp.fromMillis(Math.max(Date.now(),ADM[uid]||0)+30*864e5)}); toast('Activated'); admin(); }catch(e){ toast('Error: '+e.code); } }
+const pinKey = () => 'zenta_pin_'+uid;
+async function hash(p){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(uid+':'+p)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+let unlocked=false, bad=0, hiddenAt=0;
+function checkPin(){ const need=uid && localStorage.getItem(pinKey()) && !unlocked; $('pinlock').style.display=need?'block':'none';
+  if(need){ $('pinin').value=''; setTimeout(()=>$('pinin').focus(),50); } }
+$('pinin').oninput = async () => { const v=$('pinin').value; if(v.length<4) return;
+  if(await hash(v)===localStorage.getItem(pinKey())){ unlocked=true; bad=0; $('pinmsg').textContent=''; checkPin(); }
+  else { bad++; $('pinin').value=''; if(bad>=5){ localStorage.removeItem(pinKey()); signOut(auth); } else $('pinmsg').textContent='Wrong PIN. '+(5-bad)+' tries left'; } };
+$('pinforgot').onclick = e => { e.preventDefault(); localStorage.removeItem(pinKey()); unlocked=false; signOut(auth); };
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) hiddenAt=Date.now(); else if(hiddenAt && Date.now()-hiddenAt>30000){ unlocked=false; checkPin(); } });
+function setPin(){
+  if(localStorage.getItem(pinKey())) sheet('Turn off app PIN',[{k:'p',label:'Enter your current PIN',type:'password'}], async v=>{
+    if(await hash(v.p)!==localStorage.getItem(pinKey())) return toast('Wrong PIN'), false; localStorage.removeItem(pinKey()); toast('PIN turned off'); render(); });
+  else sheet('Set a 4-digit PIN',[{k:'p',label:'New PIN (4 digits)',type:'password'},{k:'q',label:'Repeat PIN',type:'password'}], async v=>{
+    if(!/^\d{4}$/.test(v.p)) return toast('PIN must be 4 digits'), false; if(v.p!==v.q) return toast('PINs do not match'), false;
+    localStorage.setItem(pinKey(), await hash(v.p)); unlocked=true; toast('PIN saved'); render(); }); }
+function showDeleted(){
+  const L=[...D.sales.map(x=>({n:'sales',x,t:`Sale: ${x.item} × ${x.qty} · ${K(x.total)}`})),...D.expenses.map(x=>({n:'expenses',x,t:`Expense: ${x.what} · ${K(x.amt)}`}))].sort((a,b)=>(b.x.delAt||0)-(a.x.delAt||0));
+  $('sin').innerHTML='<h2 style="margin-top:0">Deleted entries</h2>'+(L.map(r=>`<div class="row"><div>${esc(r.t)}<small>Deleted ${dstr(r.x.delAt||r.x.t)}</small></div><button class="sm" onclick="A.restore('${r.n}','${r.x.id}')">Restore</button></div>`).join('')||'<div class="empty">Nothing deleted.</div>')+'<button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>';
+  $('sheet').style.display='flex'; }
+const restore = (n,id) => { updateDoc(docRef(n,id),{deleted:false,delAt:null}); toast('Restored'); setTimeout(showDeleted,500); };
+const okey = () => 'zenta_owner_'+uid;
+const ohash = p => hash('owner:'+p);
+function askOwner(cb){ if(!localStorage.getItem(okey())) return cb();
+  sheet('Owner PIN',[{k:'p',label:'Enter the owner PIN',type:'password'}], async v=>{
+    if(await ohash(v.p)!==localStorage.getItem(okey())){ toast('Wrong owner PIN'); return false; } setTimeout(cb,50); },'Confirm'); }
+function setOwner(){
+  if(localStorage.getItem(okey())) return askOwner(()=>sheet('Change or turn off owner PIN',[{k:'p',label:'New 4-digit PIN (leave empty to turn off)',type:'password'}], async v=>{
+    if(!v.p){ localStorage.removeItem(okey()); toast('Owner PIN turned off'); render(); return; }
+    if(!/^\d{4}$/.test(v.p)) return toast('PIN must be 4 digits'), false; localStorage.setItem(okey(), await ohash(v.p)); toast('Owner PIN changed'); render(); }));
+  sheet('Set owner PIN',[{k:'p',label:'Owner PIN (4 digits, keep it secret)',type:'password'},{k:'q',label:'Repeat PIN',type:'password'}], async v=>{
+    if(!/^\d{4}$/.test(v.p)) return toast('PIN must be 4 digits'), false; if(v.p!==v.q) return toast('PINs do not match'), false;
+    localStorage.setItem(okey(), await ohash(v.p)); toast('Owner PIN saved'); render(); }); }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
@@ -227,8 +266,8 @@ function receive(id){
     b.set(doc(col('payments')),{t:Date.now(),cid:id,cname:c.name,amt:a}); await b.commit(); toast('Payment recorded');
   },'Record payment');
 }
-function del(name,id){ if(confirm('Delete this entry?')) deleteDoc(docRef(name,id)); }
-window.A={admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
+window.A={setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
@@ -240,6 +279,7 @@ const fab=(fn,label)=>`<button class="fab" onclick="A.${fn}()">+ ${label}</butto
 
 function render(){
   if(!uid) return;
+  checkPin();
   const ac=access(); $('lock').style.display=ac.ok?'none':'block'; $('ref').textContent=acct&&acct.phone?acct.phone:(auth.currentUser?auth.currentUser.email:'');
   if(ac.ok) sb(ac.paid?`Subscribed · ${ac.left} days left`:`Free trial · ${ac.left} days left`);
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.t===tab));
@@ -266,7 +306,7 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    ${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
+    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${D.sales.length+D.expenses.length})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${localStorage.getItem(okey())?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
 function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
