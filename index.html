@@ -136,7 +136,7 @@ $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,
 $('forgot').onclick = async e => { e.preventDefault(); const m=$('em').value.trim(); if(!m) return toast('Type your email first');
   try{ await sendPasswordResetEmail(auth,m); toast('Reset link sent. Check your email'); }catch(x){ toast(authErr(x)); } };
 onAuthStateChanged(auth, u => {
-  unlocked=false; bad=0; ownerHash=''; settingsReady=false;
+  unlocked=false; bad=0; ownerHash=''; settingsReady=false; bizName='';
   unsubs.forEach(f=>f()); unsubs=[]; dataUnsubs.forEach(f=>f()); dataUnsubs=[]; started=false; acct=null;
   if(!u){ uid=null; $('app').style.display='none'; $('login').style.display='block'; return; }
   uid=u.uid; $('login').style.display='none'; $('app').style.display='block';
@@ -196,10 +196,10 @@ function showDeleted(){
   $('sin').innerHTML='<h2 style="margin-top:0">Deleted entries</h2>'+(L.map(r=>`<div class="row"><div>${esc(r.t)}<small>Deleted ${dstr(r.x.delAt||r.x.t)}</small></div><button class="sm" onclick="A.restore('${r.n}','${r.x.id}')">Restore</button></div>`).join('')||'<div class="empty">Nothing deleted.</div>')+'<button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>';
   $('sheet').style.display='flex'; }
 const restore = (n,id) => { updateDoc(docRef(n,id),{deleted:false,delAt:null}); toast('Restored'); setTimeout(showDeleted,500); };
-let ownerHash='', settingsReady=false;
+let ownerHash='', settingsReady=false, bizName='';
 const ohash = p => hash('owner:'+p);
 const saveOwner = h => setDoc(docRef('private','settings'),{owner:h},{merge:true});
-function watchSettings(){ unsubs.push(onSnapshot(docRef('private','settings'), s=>{ ownerHash=s.exists()?(s.data().owner||''):''; settingsReady=true; render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
+function watchSettings(){ unsubs.push(onSnapshot(docRef('private','settings'), s=>{ ownerHash=s.exists()?(s.data().owner||''):''; bizName=s.exists()?(s.data().biz||''):''; settingsReady=true; render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
 function askOwner(cb){
   if(!settingsReady) return toast('Please wait a moment and try again');
   if(!ownerHash) return cb();
@@ -240,11 +240,25 @@ function editCustomer(id){ const c=S.customers.find(x=>x.id===id);
   $('sin').insertAdjacentHTML('beforeend','<button class="sec" id="dl" style="width:100%;margin-top:8px;color:var(--red)">Delete customer</button>');
   $('dl').onclick=()=>{ if(c.owed>0) return toast('This customer still owes '+K(c.owed)); closeSheet(); askOwner(()=>{ if(confirm('Delete this customer? You can restore them from Deleted entries.')) updateDoc(docRef('customers',id),{deleted:true,delAt:Date.now()}).then(()=>toast('Moved to Deleted')); }); }; }
 function showLog(){ $('sin').innerHTML='<h2 style="margin-top:0">Stock changes</h2>'+(S.stocklog.slice(0,100).map(l=>`<div class="row"><div>${esc(l.name)}<small>${esc(l.txt)}</small></div><small>${dstr(l.t)}</small></div>`).join('')||'<div class="empty">No changes recorded yet.</div>')+'<button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>'; $('sheet').style.display='flex'; }
+function setBiz(){ sheet('Business name',[{k:'n',label:'Your shop name (shown on receipts)',v:bizName}], async v=>{
+  if(!v.n) return toast('Enter a name'), false; await setDoc(docRef('private','settings'),{biz:v.n},{merge:true}); bizName=v.n; toast('Saved'); render(); }); }
+function receipt(id){ const s=S.sales.find(x=>x.id===id); if(!s) return;
+  const go=()=>{ const c=S.customers.find(x=>x.id===s.cid);
+    const d=new Date(s.t).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const L=['*'+bizName+'*','Receipt',d,'------------------',s.item+' × '+s.qty+' @ '+K(s.price),'*Total: '+K(s.total)+'*','Paid by: '+(s.mode==='credit'?'Nkongole (not yet paid)':(ML[s.mode]||'Cash'))];
+    if(s.mode==='credit'&&c) L.push('Balance owed: '+K(c.owed));
+    L.push('','Thank you!'); const txt=L.join('\n');
+    let num=c&&c.phone?c.phone.replace(/[^\d]/g,''):''; if(num.startsWith('0')) num='260'+num.slice(1);
+    const url='https://wa.me/'+num+'?text='+encodeURIComponent(txt);
+    $('sin').innerHTML='<h2 style="margin-top:0">Receipt</h2><div class="row" style="white-space:pre-wrap;display:block">'+esc(txt)+'</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="'+url+'" target="_blank" rel="noopener">Send on WhatsApp</a><button class="sec" id="cp" style="width:100%;margin-top:8px">Copy text</button><button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>';
+    $('sheet').style.display='flex'; $('cp').onclick=()=>{ if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>toast('Copied')); }; };
+  if(bizName) go(); else sheet('Business name',[{k:'n',label:'Your shop name (shown on receipts)'}], async v=>{
+    if(!v.n) return toast('Enter a name'), false; await setDoc(docRef('private','settings'),{biz:v.n},{merge:true}); bizName=v.n; setTimeout(go,50); }); }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
 // ---------- Actions ----------
-  function addSale(){
+function addSale(){
   sheet('New sale',[
     {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
     {k:'item',label:'Item name (if not from stock)'},
@@ -275,8 +289,9 @@ function addExpense(){
     if(!v.what||!+v.amt) return toast('Fill in both fields'), false;
     await addDoc(col('expenses'),{t:Date.now(),what:v.what,amt:+v.amt}); toast('Expense saved');
   });
+                                                                               
 }
-function addProduct(){
+  function addProduct(){
   sheet('New product',[{k:'name',label:'Name'},{k:'qty',label:'Quantity in stock',type:'number',v:0},
     {k:'cost',label:'Cost price (K)',type:'number'},{k:'price',label:'Selling price (K)',type:'number'}], async v=>{
     if(!v.name) return toast('Enter a name'), false;
@@ -304,7 +319,7 @@ function receive(id){
   },'Record payment');
 }
 function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
-window.A={q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
@@ -343,10 +358,10 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
+    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
-function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
+function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.receipt('${s.id}')">🧾</button> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
 
 $('mtn').textContent=PAY_MTN; $('air').textContent=PAY_AIRTEL;
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
