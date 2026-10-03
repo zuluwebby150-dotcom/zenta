@@ -54,7 +54,7 @@ label{font-size:14px;color:var(--mute)}
     <label style="color:#fff">Phone number (needed when creating an account)</label><input id="ph" type="tel" value="+260" inputmode="tel">
     <button id="send">Sign in</button>
     <button id="signup" style="margin-top:10px;background:transparent;color:#fff;border:1px solid #fff">Create account</button>
-    <p style="text-align:center;margin-top:16px"><a href="#" id="forgot" style="color:#fff">Forgot password?</a></p></div>
+    <p style="text-align:center;margin-top:16px"><a href="#" id="forgot" style="color:#fff">Forgot password?</a></p><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p></div>
 </div>
 <div id="app" style="display:none">
   <header><small id="biz">Zenta Business</small><h1 id="ttl">Today</h1></header>
@@ -82,7 +82,8 @@ const FIREBASE_CONFIG = {
   storageBucket: "zenta-business.firebasestorage.app",
   messagingSenderId: "357741602171",
   appId: "1:357741602171:web:0992c1b7dd2ff6577109de"
-};// ===================================================================================================
+};
+  // ===================================================================================================
 const TRIAL_DAYS = 15, PRICE = 100;
 const PAY_MTN = "0764173141", PAY_AIRTEL = "0974472293";   // <-- put your real numbers here
 const ADMIN_EMAIL = "zuluwebby150@gmail.com";   // the email that can open the Admin screen
@@ -265,7 +266,7 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    ${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button>`; }
+    ${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
 function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
