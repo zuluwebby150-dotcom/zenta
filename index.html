@@ -48,13 +48,13 @@ label{font-size:14px;color:var(--mute)}
 <body>
 <div id="toast"></div>
 <div id="login" style="display:none">
-  <h1>Zenta</h1><p>Run your business from your phone. Sign in with your phone number.</p>
-  <div id="step1"><label style="color:#fff">Phone number</label>
-    <input id="ph" type="tel" value="+260" inputmode="tel">
-    <button id="send">Send code</button></div>
-  <div id="step2" style="display:none"><label style="color:#fff">6-digit code</label>
-    <input id="code" inputmode="numeric" maxlength="6"><button id="verify">Sign in</button></div>
-  <div id="rc"></div>
+  <h1>Zenta</h1><p>Run your business from your phone. Sign in with your email.</p>
+  <div id="step1"><label style="color:#fff">Email</label><input id="em" type="email" autocomplete="email">
+    <label style="color:#fff">Password (6+ characters)</label><input id="pw" type="password" autocomplete="current-password">
+    <label style="color:#fff">Phone number (needed when creating an account)</label><input id="ph" type="tel" value="+260" inputmode="tel">
+    <button id="send">Sign in</button>
+    <button id="signup" style="margin-top:10px;background:transparent;color:#fff;border:1px solid #fff">Create account</button>
+    <p style="text-align:center;margin-top:16px"><a href="#" id="forgot" style="color:#fff">Forgot password?</a></p></div>
 </div>
 <div id="app" style="display:none">
   <header><small id="biz">Zenta Business</small><h1 id="ttl">Today</h1></header>
@@ -72,7 +72,7 @@ label{font-size:14px;color:var(--mute)}
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,RecaptchaVerifier,signInWithPhoneNumber,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,increment,serverTimestamp,collectionGroup,getDocs,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // ===== PASTE YOUR FIREBASE CONFIG HERE (Firebase Console > Project settings > Your apps > Web) =====
 const FIREBASE_CONFIG = {
@@ -82,11 +82,10 @@ const FIREBASE_CONFIG = {
   storageBucket: "zenta-business.firebasestorage.app",
   messagingSenderId: "357741602171",
   appId: "1:357741602171:web:0992c1b7dd2ff6577109de"
-};
-  // ===================================================================================================
+};// ===================================================================================================
 const TRIAL_DAYS = 15, PRICE = 100;
-const PAY_MTN = "0XXX XXX XXX", PAY_AIRTEL = "0XXX XXX XXX";   // <-- put your real numbers here
-const ADMIN_PHONE = "+260971234567";   // the sign-in number that can open the Admin screen
+const PAY_MTN = "0764173141", PAY_AIRTEL = "0974472293";   // <-- put your real numbers here
+const ADMIN_EMAIL = "zuluwebby150@gmail.com";   // the email that can open the Admin screen
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})},'default');
@@ -102,8 +101,8 @@ let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[]}, tab='das
 const sb = m => $('biz').textContent = m;
 let acct=null, per='today';
 function watchAcct(){ unsubs.push(onSnapshot(docRef('meta','account'), s=>{
-  if(!s.exists()){ setDoc(docRef('meta','account'),{start:serverTimestamp()}).catch(e=>sb('NOT SAVING TO CLOUD: '+e.code)); return; }
-  acct=s.data(); if(!acct.phone && auth.currentUser && auth.currentUser.phoneNumber) updateDoc(docRef('meta','account'),{phone:auth.currentUser.phoneNumber}).catch(()=>{}); render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
+  if(!s.exists()){ setDoc(docRef('meta','account'),{start:serverTimestamp(),phone:localStorage.getItem('zenta_phone')||'',email:(auth.currentUser&&auth.currentUser.email)||''}).catch(e=>sb('NOT SAVING TO CLOUD: '+e.code)); return; }
+  acct=s.data(); if(!acct.phone && auth.currentUser) updateDoc(docRef('meta','account'),{phone:localStorage.getItem('zenta_phone')||auth.currentUser.email||''}).catch(()=>{}); render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
 function access(){ if(!acct) return {ok:true,left:TRIAL_DAYS,paid:false};
   const now=Date.now(), st=acct.start?acct.start.toMillis():now, pu=acct.paidUntil?acct.paidUntil.toMillis():0;
   if(now<pu) return {ok:true,paid:true,left:Math.ceil((pu-now)/864e5)};
@@ -121,16 +120,12 @@ const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
-  let confirmation;
-window.rv = new RecaptchaVerifier(auth,'rc',{size:'invisible'});
-$('send').onclick = async () => {
-  try { confirmation = await signInWithPhoneNumber(auth, $('ph').value.trim().replace(/\s/g,''), window.rv);
-    $('step1').style.display='none'; $('step2').style.display='block'; }
-  catch(e){ toast('Could not send code: '+e.code); }
-};
-$('verify').onclick = async () => {
-  try { await confirmation.confirm($('code').value.trim()); } catch(e){ toast('Wrong code. Try again.'); }
-};
+const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
+$('send').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
+$('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,''); if(!/^\+260\d{9}$/.test(ph)) return toast('Phone must look like +260764173141');
+  try{ localStorage.setItem('zenta_phone',ph); await createUserWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
+$('forgot').onclick = async e => { e.preventDefault(); const m=$('em').value.trim(); if(!m) return toast('Type your email first');
+  try{ await sendPasswordResetEmail(auth,m); toast('Reset link sent. Check your email'); }catch(x){ toast(authErr(x)); } };
 onAuthStateChanged(auth, u => {
   unsubs.forEach(f=>f()); unsubs=[];
   if(!u){ uid=null; $('app').style.display='none'; $('login').style.display='block'; return; }
@@ -156,7 +151,7 @@ function sheet(title, fields, onSave, saveLabel='Save'){
     try{ if(await onSave(v)!==false) closeSheet(); }catch(e){ toast('Error: '+e.message); }
   };
 }
-const isAdmin = () => auth.currentUser && auth.currentUser.phoneNumber === ADMIN_PHONE;
+const isAdmin = () => auth.currentUser && (auth.currentUser.email||'').toLowerCase() === ADMIN_EMAIL.toLowerCase();
 let ADM = {};
 async function admin(){
   $('sin').innerHTML='<h2 style="margin-top:0">Subscribers</h2><p>Loading…</p>'; $('sheet').style.display='flex';
@@ -164,7 +159,7 @@ async function admin(){
     q.forEach(d=>{ if(d.id!=='account') return; const a=d.data(), uid=d.ref.parent.parent.id,
       st=a.start?a.start.toMillis():now, pu=a.paidUntil?a.paidUntil.toMillis():0, tl=Math.ceil((st+TRIAL_DAYS*864e5-now)/864e5);
       const k=now<pu?'paid':tl>0?'trial':'expired'; ADM[uid]=pu;
-      rows.push({uid,k,phone:a.phone||uid.slice(0,8),txt:k==='paid'?`Paid · ${Math.ceil((pu-now)/864e5)} days left`:k==='trial'?`Trial · ${tl} days left`:'Expired'}); });
+      rows.push({uid,k,phone:((a.phone||'')+(a.email?' · '+a.email:''))||uid.slice(0,8),txt:k==='paid'?`Paid · ${Math.ceil((pu-now)/864e5)} days left`:k==='trial'?`Trial · ${tl} days left`:'Expired'}); });
     const n=k=>rows.filter(r=>r.k===k).length;
     $('sin').innerHTML=`<h2 style="margin-top:0">Subscribers (${rows.length})</h2><p style="color:var(--mute);margin-bottom:10px">Paid ${n('paid')} · Trial ${n('trial')} · Expired ${n('expired')} · Monthly income about K${n('paid')*PRICE}</p>`+
       (rows.map(r=>`<div class="row"><div>${esc(r.phone)}<small class="${r.k==='expired'?'neg':''}">${r.txt}</small></div><button class="sm" onclick="A.extend('${r.uid}')">+30 days</button></div>`).join('')||'<div class="empty">No subscribers yet.</div>')+
@@ -177,7 +172,7 @@ const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
 // ---------- Actions ----------
-  function addSale(){
+function addSale(){
   sheet('New sale',[
     {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
     {k:'item',label:'Item name (if not from stock)'},
@@ -235,7 +230,7 @@ function del(name,id){ if(confirm('Delete this entry?')) deleteDoc(docRef(name,i
 window.A={admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
-  const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
+const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
 function buildNav(){ $('nav').innerHTML=tabs.map(t=>`<a href="#" data-t="${t[0]}"><i>${t[1]}</i>${t[2]}</a>`).join('');
   $('nav').onclick=e=>{const a=e.target.closest('a'); if(a){e.preventDefault(); tab=a.dataset.t; render();}}; }
 const sum=(a,f)=>a.reduce((s,x)=>s+(+f(x)||0),0);
@@ -244,7 +239,7 @@ const fab=(fn,label)=>`<button class="fab" onclick="A.${fn}()">+ ${label}</butto
 
 function render(){
   if(!uid) return;
-  const ac=access(); $('lock').style.display=ac.ok?'none':'block'; $('ref').textContent=auth.currentUser?auth.currentUser.phoneNumber:'';
+  const ac=access(); $('lock').style.display=ac.ok?'none':'block'; $('ref').textContent=acct&&acct.phone?acct.phone:(auth.currentUser?auth.currentUser.email:'');
   if(ac.ok) sb(ac.paid?`Subscribed · ${ac.left} days left`:`Free trial · ${ac.left} days left`);
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.t===tab));
   const tSales=S.sales.filter(inR), tExp=S.expenses.filter(inR), pl=PER.find(p=>p[0]===per)[1];
