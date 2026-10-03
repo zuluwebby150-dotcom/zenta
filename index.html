@@ -76,7 +76,7 @@ label{font-size:14px;color:var(--mute)}
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,EmailAuthProvider,reauthenticateWithCredential,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,increment,serverTimestamp,collectionGroup,getDocs,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // ===== PASTE YOUR FIREBASE CONFIG HERE (Firebase Console > Project settings > Your apps > Web) =====
 const FIREBASE_CONFIG = {
@@ -130,17 +130,17 @@ const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
   const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
-$('send').onclick = async () => { try{ const c=await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); localStorage.removeItem('zenta_owner_'+c.user.uid); }catch(e){ toast(authErr(e)); } };
+$('send').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
 $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,''); if(!/^\+260\d{9}$/.test(ph)) return toast('Phone must look like +260764173141');
   try{ localStorage.setItem('zenta_phone',ph); await createUserWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
 $('forgot').onclick = async e => { e.preventDefault(); const m=$('em').value.trim(); if(!m) return toast('Type your email first');
   try{ await sendPasswordResetEmail(auth,m); toast('Reset link sent. Check your email'); }catch(x){ toast(authErr(x)); } };
 onAuthStateChanged(auth, u => {
-  unlocked=false; bad=0;
+  unlocked=false; bad=0; ownerHash=''; settingsReady=false;
   unsubs.forEach(f=>f()); unsubs=[]; dataUnsubs.forEach(f=>f()); dataUnsubs=[]; started=false; acct=null;
   if(!u){ uid=null; $('app').style.display='none'; $('login').style.display='block'; return; }
   uid=u.uid; $('login').style.display='none'; $('app').style.display='block';
-  watchAcct();
+  watchAcct(); watchSettings();
   buildNav(); render();
 });
 
@@ -196,18 +196,30 @@ function showDeleted(){
   $('sin').innerHTML='<h2 style="margin-top:0">Deleted entries</h2>'+(L.map(r=>`<div class="row"><div>${esc(r.t)}<small>Deleted ${dstr(r.x.delAt||r.x.t)}</small></div><button class="sm" onclick="A.restore('${r.n}','${r.x.id}')">Restore</button></div>`).join('')||'<div class="empty">Nothing deleted.</div>')+'<button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>';
   $('sheet').style.display='flex'; }
 const restore = (n,id) => { updateDoc(docRef(n,id),{deleted:false,delAt:null}); toast('Restored'); setTimeout(showDeleted,500); };
-const okey = () => 'zenta_owner_'+uid;
+let ownerHash='', settingsReady=false;
 const ohash = p => hash('owner:'+p);
-function askOwner(cb){ if(!localStorage.getItem(okey())) return cb();
+const saveOwner = h => setDoc(docRef('private','settings'),{owner:h},{merge:true});
+function watchSettings(){ unsubs.push(onSnapshot(docRef('private','settings'), s=>{ ownerHash=s.exists()?(s.data().owner||''):''; settingsReady=true; render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
+function askOwner(cb){
+  if(!settingsReady) return toast('Please wait a moment and try again');
+  if(!ownerHash) return cb();
   sheet('Owner PIN',[{k:'p',label:'Enter the owner PIN',type:'password'}], async v=>{
-    if(await ohash(v.p)!==localStorage.getItem(okey())){ toast('Wrong owner PIN'); return false; } setTimeout(cb,50); },'Confirm'); }
+    if(await ohash(v.p)!==ownerHash){ toast('Wrong owner PIN'); return false; } setTimeout(cb,50); },'Confirm');
+  $('sin').insertAdjacentHTML('beforeend','<p style="text-align:center;margin-top:12px"><a href="#" id="of">Forgot owner PIN?</a></p>');
+  $('of').onclick = e => { e.preventDefault(); forgotOwner(); }; }
+function forgotOwner(){
+  sheet('Reset owner PIN',[{k:'pw',label:'Your account password (staff do not have this)',type:'password'},{k:'p',label:'New 4-digit owner PIN',type:'password'}], async v=>{
+    if(!/^\d{4}$/.test(v.p)) return toast('PIN must be 4 digits'), false;
+    try{ await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, v.pw)); }catch(e){ toast('Wrong account password'); return false; }
+    await saveOwner(await ohash(v.p)); toast('Owner PIN reset'); },'Reset PIN'); }
 function setOwner(){
-  if(localStorage.getItem(okey())) return askOwner(()=>sheet('Change or turn off owner PIN',[{k:'p',label:'New 4-digit PIN (leave empty to turn off)',type:'password'}], async v=>{
-    if(!v.p){ localStorage.removeItem(okey()); toast('Owner PIN turned off'); render(); return; }
-    if(!/^\d{4}$/.test(v.p)) return toast('PIN must be 4 digits'), false; localStorage.setItem(okey(), await ohash(v.p)); toast('Owner PIN changed'); render(); }));
+  if(ownerHash) return askOwner(()=>sheet('Change or turn off owner PIN',[{k:'p',label:'New 4-digit PIN (leave empty to turn off)',type:'password'}], async v=>{
+    if(!v.p){ await saveOwner(''); toast('Owner PIN turned off'); return; }
+    if(!/^\d{4}$/.test(v.p)) return toast('PIN must be 4 digits'), false; await saveOwner(await ohash(v.p)); toast('Owner PIN changed'); }));
+  if(!settingsReady) return toast('Please wait a moment and try again');
   sheet('Set owner PIN',[{k:'p',label:'Owner PIN (4 digits, keep it secret)',type:'password'},{k:'q',label:'Repeat PIN',type:'password'}], async v=>{
     if(!/^\d{4}$/.test(v.p)) return toast('PIN must be 4 digits'), false; if(v.p!==v.q) return toast('PINs do not match'), false;
-    localStorage.setItem(okey(), await ohash(v.p)); toast('Owner PIN saved'); render(); }); }
+    await saveOwner(await ohash(v.p)); toast('Owner PIN saved'); }); }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
@@ -306,7 +318,7 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${D.sales.length+D.expenses.length})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${localStorage.getItem(okey())?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
+    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${D.sales.length+D.expenses.length})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
 function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
