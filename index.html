@@ -83,7 +83,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "357741602171",
   appId: "1:357741602171:web:0992c1b7dd2ff6577109de"
 };
-  // ===================================================================================================
+// ===================================================================================================
 const TRIAL_DAYS = 15, PRICE = 100;
 const PAY_MTN = "0764173141", PAY_AIRTEL = "0974472293";   // <-- put your real numbers here
 const ADMIN_EMAIL = "zuluwebby150@gmail.com";   // the email that can open the Admin screen
@@ -100,10 +100,14 @@ const dayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d.getTi
 
 let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[]}, tab='dash', unsubs=[];
 const sb = m => $('biz').textContent = m;
-let acct=null, per='today';
+let acct=null, per='today', started=false, dataUnsubs=[];
+function startData(){ if(started) return; started=true; dataUnsubs.forEach(f=>f()); dataUnsubs=[];
+  Object.keys(S).forEach(n => dataUnsubs.push(onSnapshot(query(col(n),orderBy('t','desc'),limit(500)), s => {
+    S[n]=s.docs.map(d=>({id:d.id,...d.data()})); render();
+  }, e => { started=false; if(access().ok) sb('NOT SAVING TO CLOUD: '+e.code); }))); }
 function watchAcct(){ unsubs.push(onSnapshot(docRef('meta','account'), s=>{
   if(!s.exists()){ setDoc(docRef('meta','account'),{start:serverTimestamp(),phone:localStorage.getItem('zenta_phone')||'',email:(auth.currentUser&&auth.currentUser.email)||''}).catch(e=>sb('NOT SAVING TO CLOUD: '+e.code)); return; }
-  acct=s.data(); if(!acct.phone && auth.currentUser) updateDoc(docRef('meta','account'),{phone:localStorage.getItem('zenta_phone')||auth.currentUser.email||''}).catch(()=>{}); render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
+  acct=s.data(); if(!acct.phone && auth.currentUser) updateDoc(docRef('meta','account'),{phone:localStorage.getItem('zenta_phone')||auth.currentUser.email||''}).catch(()=>{}); if(access().ok) startData(); render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
 function access(){ if(!acct) return {ok:true,left:TRIAL_DAYS,paid:false};
   const now=Date.now(), st=acct.start?acct.start.toMillis():now, pu=acct.paidUntil?acct.paidUntil.toMillis():0;
   if(now<pu) return {ok:true,paid:true,left:Math.ceil((pu-now)/864e5)};
@@ -128,17 +132,13 @@ $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,
 $('forgot').onclick = async e => { e.preventDefault(); const m=$('em').value.trim(); if(!m) return toast('Type your email first');
   try{ await sendPasswordResetEmail(auth,m); toast('Reset link sent. Check your email'); }catch(x){ toast(authErr(x)); } };
 onAuthStateChanged(auth, u => {
-  unsubs.forEach(f=>f()); unsubs=[];
+  unsubs.forEach(f=>f()); unsubs=[]; dataUnsubs.forEach(f=>f()); dataUnsubs=[]; started=false; acct=null;
   if(!u){ uid=null; $('app').style.display='none'; $('login').style.display='block'; return; }
   uid=u.uid; $('login').style.display='none'; $('app').style.display='block';
-  Object.keys(S).forEach(n => unsubs.push(onSnapshot(query(col(n),orderBy('t','desc'),limit(500)), s => {
-    S[n]=s.docs.map(d=>({id:d.id,...d.data()})); render();
-  }, e => sb('NOT SAVING TO CLOUD: '+e.code))));
   watchAcct();
   buildNav(); render();
 });
-
-// ---------- Sheet (bottom form) ----------
+  // ---------- Sheet (bottom form) ----------
 function sheet(title, fields, onSave, saveLabel='Save'){
   $('sin').innerHTML = `<h2 style="margin-top:0">${title}</h2>` + fields.map(f =>
     `<label>${f.label}</label>` + (f.opts
