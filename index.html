@@ -102,7 +102,7 @@ const toast = m => { const t=$('toast'); t.textContent=m; t.style.display='block
 const dstr = t => new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
 const dayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); };
 
-let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[]}, tab='dash', unsubs=[];
+let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[],stocklog:[]}, tab='dash', unsubs=[];
 const sb = m => $('biz').textContent = m;
 let acct=null, q='', per='today', started=false, dataUnsubs=[], D={sales:[],expenses:[]};
 function startData(){ if(started) return; started=true; dataUnsubs.forEach(f=>f()); dataUnsubs=[];
@@ -129,7 +129,7 @@ const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
-const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
+  const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
 $('send').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
 $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,''); if(!/^\+260\d{9}$/.test(ph)) return toast('Phone must look like +260764173141');
   try{ localStorage.setItem('zenta_phone',ph); await createUserWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
@@ -173,7 +173,7 @@ async function admin(){
       '<button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>';
   }catch(e){ $('sin').innerHTML='<h2>Subscribers</h2><p>Could not load: '+esc(e.code||e.message)+'</p><button class="sec" style="width:100%" onclick="A.close()">Close</button>'; }
 }
-  async function extend(uid){ if(!confirm('Add 30 days for this subscriber?')) return;
+async function extend(uid){ if(!confirm('Add 30 days for this subscriber?')) return;
   try{ await updateDoc(doc(db,'users',uid,'meta','account'),{paidUntil:Timestamp.fromMillis(Math.max(Date.now(),ADM[uid]||0)+30*864e5)}); toast('Activated'); admin(); }catch(e){ toast('Error: '+e.code); } }
 const pinKey = () => 'zenta_pin_'+uid;
 async function hash(p){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(uid+':'+p)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
@@ -226,19 +226,25 @@ const cRows = () => list(S.customers.filter(c=>has(c.name,q)||has(c.phone,q)),c=
 function editProduct(id){ const p=S.products.find(x=>x.id===id);
   sheet('Edit product',[{k:'name',label:'Name',v:p.name},{k:'qty',label:'Quantity in stock',type:'number',v:p.qty},{k:'cost',label:'Cost price (K)',type:'number',v:p.cost},{k:'price',label:'Selling price (K)',type:'number',v:p.price},{k:'low',label:'Warn me when stock is at or below',type:'number',v:p.low??3}], async v=>{
     if(!v.name) return toast('Enter a name'), false;
-    await updateDoc(docRef('products',id),{name:v.name,qty:+v.qty||0,cost:+v.cost||0,price:+v.price||0,low:+v.low||0}); toast('Product updated'); });
+    const nq=+v.qty||0,nc=+v.cost||0,np=+v.price||0,ch=[];
+    if(v.name!==p.name) ch.push('name: '+p.name+' → '+v.name); if(nq!==p.qty) ch.push('quantity: '+p.qty+' → '+nq);
+    if(nc!==p.cost) ch.push('cost: '+K(p.cost)+' → '+K(nc)); if(np!==p.price) ch.push('price: '+K(p.price)+' → '+K(np));
+    const b=writeBatch(db); b.update(docRef('products',id),{name:v.name,qty:nq,cost:nc,price:np,low:+v.low||0});
+    if(ch.length) b.set(doc(col('stocklog')),{t:Date.now(),name:v.name,txt:'Edited · '+ch.join(', ')});
+    await b.commit(); toast('Product updated'); });
   $('sin').insertAdjacentHTML('beforeend','<button class="sec" id="dl" style="width:100%;margin-top:8px;color:var(--red)">Delete product</button>');
-  $('dl').onclick=()=>{ closeSheet(); askOwner(()=>{ if(confirm('Delete this product? You can restore it from Deleted entries.')) updateDoc(docRef('products',id),{deleted:true,delAt:Date.now()}).then(()=>toast('Moved to Deleted')); }); }; }
+  $('dl').onclick=()=>{ closeSheet(); if(confirm('Delete this product? You can restore it from Deleted entries.')) updateDoc(docRef('products',id),{deleted:true,delAt:Date.now()}).then(()=>toast('Moved to Deleted')); }; }
 function editCustomer(id){ const c=S.customers.find(x=>x.id===id);
   sheet('Edit customer',[{k:'name',label:'Name',v:c.name},{k:'phone',label:'Phone',type:'tel',v:c.phone}], async v=>{
     if(!v.name) return toast('Enter a name'), false; await updateDoc(docRef('customers',id),{name:v.name,phone:v.phone}); toast('Customer updated'); });
   $('sin').insertAdjacentHTML('beforeend','<button class="sec" id="dl" style="width:100%;margin-top:8px;color:var(--red)">Delete customer</button>');
   $('dl').onclick=()=>{ if(c.owed>0) return toast('This customer still owes '+K(c.owed)); closeSheet(); askOwner(()=>{ if(confirm('Delete this customer? You can restore them from Deleted entries.')) updateDoc(docRef('customers',id),{deleted:true,delAt:Date.now()}).then(()=>toast('Moved to Deleted')); }); }; }
+function showLog(){ $('sin').innerHTML='<h2 style="margin-top:0">Stock changes</h2>'+(S.stocklog.slice(0,100).map(l=>`<div class="row"><div>${esc(l.name)}<small>${esc(l.txt)}</small></div><small>${dstr(l.t)}</small></div>`).join('')||'<div class="empty">No changes recorded yet.</div>')+'<button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>'; $('sheet').style.display='flex'; }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
 // ---------- Actions ----------
-function addSale(){
+  function addSale(){
   sheet('New sale',[
     {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
     {k:'item',label:'Item name (if not from stock)'},
@@ -280,7 +286,7 @@ function addProduct(){
 function restock(id){
   const p=S.products.find(x=>x.id===id);
   sheet('Add stock: '+esc(p.name),[{k:'n',label:'Quantity received',type:'number'}], async v=>{
-    if(!+v.n) return false; await updateDoc(docRef('products',id),{qty:inc(+v.n)}); toast('Stock updated');
+    if(!+v.n) return false; const b=writeBatch(db); b.update(docRef('products',id),{qty:inc(+v.n)}); b.set(doc(col('stocklog')),{t:Date.now(),name:p.name,txt:'Received +'+(+v.n)}); await b.commit(); toast('Stock updated');
   });
 }
 function addCustomer(){
@@ -298,7 +304,7 @@ function receive(id){
   },'Record payment');
 }
 function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
-window.A={q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct,editCustomer,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
@@ -337,7 +343,7 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
+    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
 function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
