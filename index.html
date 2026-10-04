@@ -68,6 +68,7 @@ label{font-size:14px;color:var(--mute)}
   <p style="margin-top:8px">Send K100 to:<br>MTN Money: <b id="mtn" style="display:inline"></b><br>Airtel Money: <b id="air" style="display:inline"></b></p>
   <p style="margin-top:8px">Use this as the payment reference: <b id="ref" style="display:inline"></b><br><small>We activate your account after your payment arrives.</small></p></div>
   <button class="sec" onclick="A.out()" style="width:100%">Sign out</button></div>
+<div id="guide" style="display:none;position:fixed;inset:0;z-index:25;background:var(--g);color:#fff;padding:70px 24px;text-align:center;overflow:auto"></div>
 <div id="pinlock" style="display:none;position:fixed;inset:0;z-index:30;background:var(--g);color:#fff;padding:90px 24px;text-align:center">
   <h1 style="font-size:30px">Enter your PIN</h1><p style="opacity:.8;margin:6px 0 20px">4-digit PIN</p>
   <input id="pinin" type="password" inputmode="numeric" maxlength="4" style="text-align:center;font-size:30px;letter-spacing:14px;max-width:220px">
@@ -129,7 +130,7 @@ const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
-const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
+  const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
 $('send').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
 $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,''); if(!/^\+260\d{9}$/.test(ph)) return toast('Phone must look like +260764173141');
   try{ localStorage.setItem('zenta_phone',ph); await createUserWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
@@ -144,7 +145,7 @@ onAuthStateChanged(auth, u => {
   buildNav(); render();
 });
 
-  // ---------- Sheet (bottom form) ----------
+// ---------- Sheet (bottom form) ----------
 function sheet(title, fields, onSave, saveLabel='Save'){
   $('sin').innerHTML = `<h2 style="margin-top:0">${title}</h2>` + fields.map(f =>
     `<label>${f.label}</label>` + (f.opts
@@ -266,6 +267,18 @@ async function exportCsv(kind){
   const file=new File([csvText(rows)],'zenta-'+kind+(kind==='stock'?'':'-'+per)+'.csv',{type:'text/csv'});
   if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:file.name}); return; }catch(e){ if(e.name==='AbortError') return; } }
   const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); toast('Saved to Downloads'); }
+const GUIDE=[['👋','Welcome to Zenta','Run your shop from your phone. This takes one minute. You have 15 days free.'],
+['📦','1. Add your products','Go to Stock and tap + Product. Enter the name, how many you have, what you paid and your selling price.'],
+['💰','2. Record every sale','Go to Sales and tap + Sale. Pick the product and how they paid. Stock goes down by itself. Choose Nkongole if they will pay later.'],
+['📊','3. See how you are doing','Home shows sales, expenses and profit. The More tab has reports, receipts and Excel export.'],
+['🔐','Protect your records','In More, set an owner PIN so only you can edit or delete. Set an app PIN to lock this phone.']];
+function showGuide(i){ const [e,t,x]=GUIDE[i], last=i===GUIDE.length-1, b='width:100%;max-width:320px;';
+  const dots=GUIDE.map((_,k)=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 4px;background:#fff;opacity:'+(k===i?1:.35)+'"></span>').join('');
+  $('guide').innerHTML='<div style="font-size:64px">'+e+'</div><h1 style="font-size:28px;margin:12px 0 8px">'+t+'</h1><p style="opacity:.9;max-width:320px;margin:0 auto 22px">'+x+'</p><div style="margin-bottom:22px">'+dots+'</div>'+
+   (last?'<button style="'+b+'background:#fff;color:var(--g)" onclick="A.gend(true)">Add my first product</button><br><br><button style="'+b+'background:transparent;color:#fff;border:1px solid #fff" onclick="A.gend(false)">I will look around</button>'
+    :'<button style="'+b+'background:#fff;color:var(--g)" onclick="A.gnav('+(i+1)+')">Next</button>'+(i?'<br><br><button style="'+b+'background:transparent;color:#fff;border:1px solid #fff" onclick="A.gnav('+(i-1)+')">Back</button>':'')+'<p style="margin-top:22px"><a href="#" style="color:#fff" onclick="A.gend(false);return false">Skip</a></p>');
+  $('guide').style.display='block'; $('guide').scrollTop=0; }
+function endGuide(go){ localStorage.setItem('zenta_guide_'+uid,'1'); $('guide').style.display='none'; if(go){ tab='stock'; render(); addProduct(); } }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
@@ -330,7 +343,7 @@ function receive(id){
   },'Record payment');
 }
 function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
-window.A={exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
@@ -345,6 +358,7 @@ function render(){
   checkPin();
   const ac=access(); $('lock').style.display=ac.ok?'none':'block'; $('ref').textContent=acct&&acct.phone?acct.phone:(auth.currentUser?auth.currentUser.email:'');
   if(ac.ok) sb(ac.paid?`Subscribed · ${ac.left} days left`:`Free trial · ${ac.left} days left`);
+  if(ac.ok && !localStorage.getItem('zenta_guide_'+uid) && $('guide').style.display!=='block') showGuide(0);
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.t===tab));
   const tSales=S.sales.filter(inR), tExp=S.expenses.filter(inR), pl=PER.find(p=>p[0]===per)[1];
   const sales=sum(tSales,s=>s.total), exp=sum(tExp,e=>e.amt), owed=sum(S.customers,c=>c.owed), stockV=sum(S.products,p=>p.qty*p.cost);
@@ -369,7 +383,7 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.exportMenu()">Export to Excel (CSV)</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
+    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.guide()">How to use Zenta</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.exportMenu()">Export to Excel (CSV)</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
 function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.receipt('${s.id}')">🧾</button> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
