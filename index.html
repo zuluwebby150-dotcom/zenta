@@ -77,7 +77,7 @@ label{font-size:14px;color:var(--mute)}
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,EmailAuthProvider,reauthenticateWithCredential,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,EmailAuthProvider,reauthenticateWithCredential,deleteUser,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,increment,serverTimestamp,collectionGroup,getDocs,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // ===== PASTE YOUR FIREBASE CONFIG HERE (Firebase Console > Project settings > Your apps > Web) =====
 const FIREBASE_CONFIG = {
@@ -279,6 +279,15 @@ function showGuide(i){ const [e,t,x]=GUIDE[i], last=i===GUIDE.length-1, b='width
     :'<button style="'+b+'background:#fff;color:var(--g)" onclick="A.gnav('+(i+1)+')">Next</button>'+(i?'<br><br><button style="'+b+'background:transparent;color:#fff;border:1px solid #fff" onclick="A.gnav('+(i-1)+')">Back</button>':'')+'<p style="margin-top:22px"><a href="#" style="color:#fff" onclick="A.gend(false);return false">Skip</a></p>');
   $('guide').style.display='block'; $('guide').scrollTop=0; }
 function endGuide(go){ localStorage.setItem('zenta_guide_'+uid,'1'); $('guide').style.display='none'; if(go){ tab='stock'; render(); addProduct(); } }
+function deleteAccount(){
+  sheet('Delete my account',[{k:'pw',label:'This permanently deletes ALL your records. Enter your password to confirm',type:'password'}], async v=>{
+    try{ await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, v.pw)); }catch(e){ toast('Wrong password'); return false; }
+    try{ unsubs.forEach(f=>f()); dataUnsubs.forEach(f=>f());
+      for(const n of ['sales','expenses','products','customers','payments','stocklog','private','meta']){
+        const q=await getDocs(col(n));
+        for(let i=0;i<q.docs.length;i+=400){ const b=writeBatch(db); q.docs.slice(i,i+400).forEach(d=>b.delete(d.ref)); await b.commit(); } }
+      await deleteUser(auth.currentUser); toast('Your account was deleted');
+    }catch(e){ toast('Could not finish: '+(e.code||e.message)); return false; } },'Delete everything'); }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
@@ -343,7 +352,7 @@ function receive(id){
   },'Record payment');
 }
 function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
-window.A={gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={delAcct:()=>askOwner(deleteAccount),gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
@@ -383,7 +392,7 @@ function render(){
     <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.guide()">How to use Zenta</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.exportMenu()">Export to Excel (CSV)</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
+    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.guide()">How to use Zenta</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.exportMenu()">Export to Excel (CSV)</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:14px"><a href="#" onclick="A.delAcct();return false" style="color:var(--red)">Delete my account</a></p><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
 function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.receipt('${s.id}')">🧾</button> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
