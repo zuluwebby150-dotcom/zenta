@@ -164,7 +164,7 @@ let ADM = {};
 async function admin(){
   $('sin').innerHTML='<h2 style="margin-top:0">Subscribers</h2><p>Loading…</p>'; $('sheet').style.display='flex';
   try{ const q=await getDocs(collectionGroup(db,'meta')), now=Date.now(), rows=[]; ADM={};
-    q.forEach(d=>{ if(d.id!=='account') return; const a=d.data(), uid=d.ref.parent.parent.id,
+    q.forEach(d=>{ if(d.id!=='account') return; const a=d.data(); if(!a.phone && !a.email) return; const uid=d.ref.parent.parent.id,
       st=a.start?a.start.toMillis():now, pu=a.paidUntil?a.paidUntil.toMillis():0, tl=Math.ceil((st+TRIAL_DAYS*864e5-now)/864e5);
       const k=now<pu?'paid':tl>0?'trial':'expired'; ADM[uid]=pu;
       rows.push({uid,k,phone:((a.phone||'')+(a.email?' · '+a.email:''))||uid.slice(0,8),txt:k==='paid'?`Paid · ${Math.ceil((pu-now)/864e5)} days left`:k==='trial'?`Trial · ${tl} days left`:'Expired'}); });
@@ -286,14 +286,14 @@ function deleteAccount(){
       for(const n of ['sales','expenses','products','customers','payments','stocklog','private']){
         const q=await getDocs(col(n));
         for(let i=0;i<q.docs.length;i+=400){ const b=writeBatch(db); q.docs.slice(i,i+400).forEach(d=>b.delete(d.ref)); await b.commit(); } }
-      await deleteDoc(docRef('meta','ping')); await deleteDoc(docRef('meta','account'));
+      await updateDoc(docRef('meta','account'),{phone:'',email:''});
       await deleteUser(auth.currentUser); toast('Your account was deleted');
     }catch(e){ toast('Could not finish: '+(e.code||e.message)); return false; } },'Delete everything'); }
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
-  // ---------- Actions ----------
-function addSale(){
+// ---------- Actions ----------
+  function addSale(){
   sheet('New sale',[
     {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
     {k:'item',label:'Item name (if not from stock)'},
