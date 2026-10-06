@@ -292,8 +292,71 @@ function deleteAccount(){
 const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
-// ---------- Actions ----------
-  const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
+  // ---------- Actions ----------
+function addSale(){
+  sheet('New sale',[
+    {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
+    {k:'item',label:'Item name (if not from stock)'},
+    {k:'qty',label:'Quantity',type:'number',v:1},
+    {k:'price',label:'Price each (K)',type:'number'},
+    {k:'cid',label:'Customer',opts:[['','Walk-in customer'],...S.customers.map(c=>[c.id,c.name])]},
+    {k:'mode',label:'Payment',opts:[['cash','Cash'],['mtn','MTN Money'],['airtel','Airtel Money'],['bank','Bank'],['credit','Nkongole (pay later)']]}
+  ], async v => {
+    const p=S.products.find(x=>x.id===v.pid), qty=+v.qty, price=+v.price||(p?p.price:0);
+    if(!qty||!price) return toast('Enter quantity and price'), false;
+    if(v.mode==='credit' && !v.cid) return toast('Choose a customer for Nkongole'), false;
+    if(p && qty>p.qty && !confirm(`Only ${p.qty} in stock. Continue?`)) return false;
+    const total=qty*price, c=S.customers.find(x=>x.id===v.cid);
+    const b=writeBatch(db);
+    b.set(doc(col('sales')),{t:Date.now(),item:p?p.name:(v.item||'Sale'),qty,price,total,mode:v.mode,cid:v.cid||'',cname:c?c.name:''});
+    if(p) b.update(docRef('products',p.id),{qty:inc(-qty)});
+    if(v.mode==='credit') b.update(docRef('customers',v.cid),{owed:inc(total)});
+    await b.commit(); toast('Sale saved');
+  });
+  const sel=$('f_pid'); sel.insertAdjacentHTML('beforebegin','<input id="ps" placeholder="Type to search products">');
+  const fill=t=>{ const m=S.products.filter(p=>p.name.toLowerCase().includes(t.toLowerCase()));
+    sel.innerHTML='<option value="">Other item (type below)</option>'+m.map(p=>`<option value="${p.id}">${esc(p.name)} (${p.qty} left)</option>`).join(''); if(t&&m.length){ sel.value=m[0].id; sel.onchange(); } };
+  sel.onchange=()=>{ const p=S.products.find(x=>x.id===sel.value); if(p) $('f_price').value=p.price; };
+  $('ps').oninput=()=>fill($('ps').value);
+}
+function addExpense(){
+  sheet('New expense',[{k:'what',label:'What was it for?'},{k:'amt',label:'Amount (K)',type:'number'}], async v=>{
+    if(!v.what||!+v.amt) return toast('Fill in both fields'), false;
+    await addDoc(col('expenses'),{t:Date.now(),what:v.what,amt:+v.amt}); toast('Expense saved');
+  });
+}
+function addProduct(){
+  sheet('New product',[{k:'name',label:'Name'},{k:'qty',label:'Quantity in stock',type:'number',v:0},
+    {k:'cost',label:'Cost price (K)',type:'number'},{k:'price',label:'Selling price (K)',type:'number'}], async v=>{
+    if(!v.name) return toast('Enter a name'), false;
+    await addDoc(col('products'),{t:Date.now(),name:v.name,qty:+v.qty||0,cost:+v.cost||0,price:+v.price||0}); toast('Product saved');
+  });
+}
+function restock(id){
+  const p=S.products.find(x=>x.id===id);
+  sheet('Add stock: '+esc(p.name),[{k:'n',label:'Quantity received',type:'number'}], async v=>{
+    if(!+v.n) return false; const b=writeBatch(db); b.update(docRef('products',id),{qty:inc(+v.n)}); b.set(doc(col('stocklog')),{t:Date.now(),name:p.name,txt:'Received +'+(+v.n)}); await b.commit(); toast('Stock updated');
+  });
+}
+function addCustomer(){
+  sheet('New customer',[{k:'name',label:'Name'},{k:'phone',label:'Phone',type:'tel'}], async v=>{
+    if(!v.name) return toast('Enter a name'), false;
+    await addDoc(col('customers'),{t:Date.now(),name:v.name,phone:v.phone,owed:0}); toast('Customer saved');
+  });
+}
+function receive(id){
+  const c=S.customers.find(x=>x.id===id);
+  sheet(`Payment from ${esc(c.name)} (owes ${K(c.owed)})`,[{k:'amt',label:'Amount received (K)',type:'number'}], async v=>{
+    const a=+v.amt; if(!a||a>c.owed) return toast('Amount must be up to '+K(c.owed)), false;
+    const b=writeBatch(db); b.update(docRef('customers',id),{owed:inc(-a)});
+    b.set(doc(col('payments')),{t:Date.now(),cid:id,cname:c.name,amt:a}); await b.commit(); toast('Payment recorded');
+  },'Record payment');
+}
+function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
+window.A={delAcct:()=>askOwner(deleteAccount),gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+
+// ---------- Views ----------
+const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
 function buildNav(){ $('nav').innerHTML=tabs.map(t=>`<a href="#" data-t="${t[0]}"><i>${t[1]}</i>${t[2]}</a>`).join('');
   $('nav').onclick=e=>{const a=e.target.closest('a'); if(a){e.preventDefault(); tab=a.dataset.t; q=''; render();}}; }
 const sum=(a,f)=>a.reduce((s,x)=>s+(+f(x)||0),0);
