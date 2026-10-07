@@ -78,7 +78,7 @@ label{font-size:14px;color:var(--mute)}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,EmailAuthProvider,reauthenticateWithCredential,deleteUser,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,increment,serverTimestamp,collectionGroup,getDocs,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,where,increment,serverTimestamp,collectionGroup,getDocs,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // ===== PASTE YOUR FIREBASE CONFIG HERE (Firebase Console > Project settings > Your apps > Web) =====
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDMraLmuAsI3Nm_IyE0tHD6sgTJLrjbjVA",
@@ -105,9 +105,12 @@ const dayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d.getTi
 
 let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[],stocklog:[]}, tab='dash', unsubs=[];
 const sb = m => $('biz').textContent = m;
-let acct=null, q='', per='today', started=false, dataUnsubs=[], D={sales:[],expenses:[]};
+let acct=null, q='', per='today', started=false, dataUnsubs=[], D={sales:[],expenses:[]}, loadedFor='';
 function startData(){ if(started) return; started=true; dataUnsubs.forEach(f=>f()); dataUnsubs=[];
-  Object.keys(S).forEach(n => dataUnsubs.push(onSnapshot(query(col(n),orderBy('t','desc'),limit(500)), s => {
+  const [a,b]=range(); loadedFor=per+':'+a;
+  const cons=n=>{ if(['sales','expenses','payments'].includes(n)){ const c=[where('t','>=',a)]; if(b!==Infinity) c.push(where('t','<',b)); return [...c,orderBy('t','desc')]; }
+    return n==='stocklog'?[orderBy('t','desc'),limit(100)]:[orderBy('t','desc')]; };
+  Object.keys(S).forEach(n => dataUnsubs.push(onSnapshot(query(col(n),...cons(n)), s => {
     const all=s.docs.map(d=>({id:d.id,...d.data()})); S[n]=all.filter(x=>!x.deleted); D[n]=all.filter(x=>x.deleted); render();
   }, e => { started=false; if(access().ok) sb('NOT SAVING TO CLOUD: '+e.code); }))); }
 function watchAcct(){ unsubs.push(onSnapshot(docRef('meta','account'), s=>{
@@ -130,7 +133,7 @@ const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
-  const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
+const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
 $('send').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
 $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,''); if(!/^\+260\d{9}$/.test(ph)) return toast('Phone must look like +260764173141');
   try{ localStorage.setItem('zenta_phone',ph); await createUserWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
@@ -185,6 +188,7 @@ $('pinin').oninput = async () => { const v=$('pinin').value; if(v.length<4) retu
   if(await hash(v)===localStorage.getItem(pinKey())){ unlocked=true; bad=0; $('pinmsg').textContent=''; checkPin(); }
   else { bad++; $('pinin').value=''; if(bad>=5){ localStorage.removeItem(pinKey()); signOut(auth); } else $('pinmsg').textContent='Wrong PIN. '+(5-bad)+' tries left'; } };
 $('pinforgot').onclick = e => { e.preventDefault(); localStorage.removeItem(pinKey()); unlocked=false; signOut(auth); };
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && uid && started){ const [x]=range(); if(loadedFor!==per+':'+x){ started=false; startData(); } } });
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) hiddenAt=Date.now(); else if(hiddenAt && Date.now()-hiddenAt>30000){ unlocked=false; checkPin(); } });
 function setPin(){
   if(localStorage.getItem(pinKey())) sheet('Turn off app PIN',[{k:'p',label:'Enter your current PIN',type:'password'}], async v=>{
@@ -353,7 +357,7 @@ function receive(id){
   },'Record payment');
 }
 function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
-window.A={delAcct:()=>askOwner(deleteAccount),gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v;render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={delAcct:()=>askOwner(deleteAccount),gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v; if(access().ok){ started=false; startData(); } render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
