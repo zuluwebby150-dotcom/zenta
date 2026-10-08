@@ -105,14 +105,14 @@ const dayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d.getTi
 
 let uid, S={sales:[],expenses:[],products:[],customers:[],payments:[],stocklog:[]}, tab='dash', unsubs=[];
 const sb = m => $('biz').textContent = m;
-let acct=null, q='', per='today', started=false, dataUnsubs=[], D={sales:[],expenses:[]}, loadedFor='';
+let acct=null, q='', per='today', started=false, dataUnsubs=[], D={sales:[],expenses:[]}, loadedFor='', retries=0;
 function startData(){ if(started) return; started=true; dataUnsubs.forEach(f=>f()); dataUnsubs=[];
   const [a,b]=range(); loadedFor=per+':'+a;
   const cons=n=>{ if(['sales','expenses','payments'].includes(n)){ const c=[where('t','>=',a)]; if(b!==Infinity) c.push(where('t','<',b)); return [...c,orderBy('t','desc')]; }
     return n==='stocklog'?[orderBy('t','desc'),limit(100)]:[orderBy('t','desc')]; };
   Object.keys(S).forEach(n => dataUnsubs.push(onSnapshot(query(col(n),...cons(n)), s => {
-    const all=s.docs.map(d=>({id:d.id,...d.data()})); S[n]=all.filter(x=>!x.deleted); D[n]=all.filter(x=>x.deleted); render();
-  }, e => { started=false; if(access().ok) sb('NOT SAVING TO CLOUD: '+e.code); }))); }
+    const all=s.docs.map(d=>({id:d.id,...d.data()})); S[n]=all.filter(x=>!x.deleted); D[n]=all.filter(x=>x.deleted); retries=0; render();
+  }, e => { started=false; if(access().ok){ sb('NOT SAVING TO CLOUD: '+e.code); if(retries++<5) setTimeout(()=>{ if(uid&&!started&&access().ok) startData(); },6000); } }))); }
 function watchAcct(){ unsubs.push(onSnapshot(docRef('meta','account'), s=>{
   if(!s.exists()){ setDoc(docRef('meta','account'),{start:serverTimestamp(),phone:localStorage.getItem('zenta_phone')||'',email:(auth.currentUser&&auth.currentUser.email)||''}).catch(e=>sb('NOT SAVING TO CLOUD: '+e.code)); return; }
   acct=s.data(); if(!acct.phone && auth.currentUser) updateDoc(docRef('meta','account'),{phone:localStorage.getItem('zenta_phone')||auth.currentUser.email||''}).catch(()=>{}); if(access().ok) startData(); render(); }, e=>sb('NOT SAVING TO CLOUD: '+e.code))); }
@@ -147,8 +147,7 @@ onAuthStateChanged(auth, u => {
   watchAcct(); watchSettings();
   buildNav(); render();
 });
-
-// ---------- Sheet (bottom form) ----------
+  // ---------- Sheet (bottom form) ----------
 function sheet(title, fields, onSave, saveLabel='Save'){
   $('sin').innerHTML = `<h2 style="margin-top:0">${title}</h2>` + fields.map(f =>
     `<label>${f.label}</label>` + (f.opts
@@ -158,8 +157,12 @@ function sheet(title, fields, onSave, saveLabel='Save'){
   $('sheet').style.display='flex';
   $('no').onclick = closeSheet;
   $('ok').onclick = async () => {
-    const v={}; fields.forEach(f=>v[f.k]=$('f_'+f.k).value.trim());
-    try{ if(await onSave(v)!==false) closeSheet(); }catch(e){ toast('Error: '+e.message); }
+    const btn=$('ok'); if(btn.disabled) return; const v={}; fields.forEach(f=>v[f.k]=$('f_'+f.k).value.trim());
+    btn.disabled=true; const lbl=btn.textContent; btn.textContent='Saving…';
+    try{ const r=await Promise.race([onSave(v), new Promise(res=>setTimeout(()=>res('slow'),1500))]);
+      if(r==='slow'){ toast('Saved on this phone. It will sync when you are online'); closeSheet(); } else if(r!==false) closeSheet();
+    }catch(e){ toast('Error: '+e.message); }
+    btn.disabled=false; btn.textContent=lbl;
   };
 }
 const isAdmin = () => auth.currentUser && (auth.currentUser.email||'').toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -200,7 +203,17 @@ function showDeleted(){
   const L=[...D.sales.map(x=>({n:'sales',x,t:`Sale: ${x.item} × ${x.qty} · ${K(x.total)}`})),...D.expenses.map(x=>({n:'expenses',x,t:`Expense: ${x.what} · ${K(x.amt)}`})),...(D.products||[]).map(x=>({n:'products',x,t:`Product: ${x.name}`})),...(D.customers||[]).map(x=>({n:'customers',x,t:`Customer: ${x.name}`}))].sort((a,b)=>(b.x.delAt||0)-(a.x.delAt||0));
   $('sin').innerHTML='<h2 style="margin-top:0">Deleted entries</h2>'+(L.map(r=>`<div class="row"><div>${esc(r.t)}<small>Deleted ${dstr(r.x.delAt||r.x.t)}</small></div><button class="sm" onclick="A.restore('${r.n}','${r.x.id}')">Restore</button></div>`).join('')||'<div class="empty">Nothing deleted.</div>')+'<button class="sec" style="width:100%;margin-top:8px" onclick="A.close()">Close</button>';
   $('sheet').style.display='flex'; }
-const restore = (n,id) => { updateDoc(docRef(n,id),{deleted:false,delAt:null}); toast('Restored'); setTimeout(showDeleted,500); };
+const prodOf = s => S.products.find(x=>x.id===s.pid)||S.products.find(x=>x.name===s.item);
+function delSale(id){ const s=S.sales.find(x=>x.id===id); if(!s) return; askOwner(()=>{
+  if(!confirm('Move this sale to Deleted? The stock and any Nkongole will be put back.')) return;
+  const b=writeBatch(db), p=prodOf(s); b.update(docRef('sales',id),{deleted:true,delAt:Date.now()});
+  if(p) b.update(docRef('products',p.id),{qty:inc(s.qty)}); if(s.mode==='credit'&&s.cid) b.update(docRef('customers',s.cid),{owed:inc(-s.total)});
+  b.commit(); toast('Sale moved to Deleted'); }); }
+const restore = (n,id) => { const s=n==='sales'?D.sales.find(x=>x.id===id):null;
+  if(s){ const b=writeBatch(db), p=prodOf(s); b.update(docRef('sales',id),{deleted:false,delAt:null});
+    if(p) b.update(docRef('products',p.id),{qty:inc(-s.qty)}); if(s.mode==='credit'&&s.cid) b.update(docRef('customers',s.cid),{owed:inc(s.total)}); b.commit(); }
+  else updateDoc(docRef(n,id),{deleted:false,delAt:null});
+  toast('Restored'); setTimeout(showDeleted,500); };
 let ownerHash='', settingsReady=false, bizName='';
 const ohash = p => hash('owner:'+p);
 const saveOwner = h => setDoc(docRef('private','settings'),{owner:h},{merge:true});
@@ -297,7 +310,7 @@ const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
 // ---------- Actions ----------
-  function addSale(){
+function addSale(){
   sheet('New sale',[
     {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
     {k:'item',label:'Item name (if not from stock)'},
@@ -307,12 +320,12 @@ $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
     {k:'mode',label:'Payment',opts:[['cash','Cash'],['mtn','MTN Money'],['airtel','Airtel Money'],['bank','Bank'],['credit','Nkongole (pay later)']]}
   ], async v => {
     const p=S.products.find(x=>x.id===v.pid), qty=+v.qty, price=+v.price||(p?p.price:0);
-    if(!qty||!price) return toast('Enter quantity and price'), false;
+    if(!(qty>0)||!(price>0)) return toast('Quantity and price must be more than 0'), false;
     if(v.mode==='credit' && !v.cid) return toast('Choose a customer for Nkongole'), false;
     if(p && qty>p.qty && !confirm(`Only ${p.qty} in stock. Continue?`)) return false;
     const total=qty*price, c=S.customers.find(x=>x.id===v.cid);
     const b=writeBatch(db);
-    b.set(doc(col('sales')),{t:Date.now(),item:p?p.name:(v.item||'Sale'),qty,price,total,mode:v.mode,cid:v.cid||'',cname:c?c.name:''});
+    b.set(doc(col('sales')),{t:Date.now(),item:p?p.name:(v.item||'Sale'),qty,price,total,mode:v.mode,cid:v.cid||'',cname:c?c.name:'',pid:p?p.id:'',cost:p?p.cost:0});
     if(p) b.update(docRef('products',p.id),{qty:inc(-qty)});
     if(v.mode==='credit') b.update(docRef('customers',v.cid),{owed:inc(total)});
     await b.commit(); toast('Sale saved');
@@ -324,8 +337,8 @@ $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
   $('ps').oninput=()=>fill($('ps').value);
 }
 function addExpense(){
-  sheet('New expense',[{k:'what',label:'What was it for?'},{k:'amt',label:'Amount (K)',type:'number'}], async v=>{
-    if(!v.what||!+v.amt) return toast('Fill in both fields'), false;
+  sheet('New expense',[{k:'what',label:'What was it for? (not stock purchases: use + Stock)'},{k:'amt',label:'Amount (K)',type:'number'}], async v=>{
+    if(!v.what||!(+v.amt>0)) return toast('Fill in what it was for and an amount above 0'), false;
     await addDoc(col('expenses'),{t:Date.now(),what:v.what,amt:+v.amt}); toast('Expense saved');
   });
 }
@@ -333,13 +346,13 @@ function addProduct(){
   sheet('New product',[{k:'name',label:'Name'},{k:'qty',label:'Quantity in stock',type:'number',v:0},
     {k:'cost',label:'Cost price (K)',type:'number'},{k:'price',label:'Selling price (K)',type:'number'}], async v=>{
     if(!v.name) return toast('Enter a name'), false;
-    await addDoc(col('products'),{t:Date.now(),name:v.name,qty:+v.qty||0,cost:+v.cost||0,price:+v.price||0}); toast('Product saved');
+    if(+v.qty<0||+v.cost<0||+v.price<0) return toast('Numbers cannot be negative'), false; await addDoc(col('products'),{t:Date.now(),name:v.name,qty:+v.qty||0,cost:+v.cost||0,price:+v.price||0}); toast('Product saved');
   });
 }
 function restock(id){
   const p=S.products.find(x=>x.id===id);
   sheet('Add stock: '+esc(p.name),[{k:'n',label:'Quantity received',type:'number'}], async v=>{
-    if(!+v.n) return false; const b=writeBatch(db); b.update(docRef('products',id),{qty:inc(+v.n)}); b.set(doc(col('stocklog')),{t:Date.now(),name:p.name,txt:'Received +'+(+v.n)}); await b.commit(); toast('Stock updated');
+    if(!(+v.n>0)) return toast('Enter a quantity above 0'), false; const b=writeBatch(db); b.update(docRef('products',id),{qty:inc(+v.n)}); b.set(doc(col('stocklog')),{t:Date.now(),name:p.name,txt:'Received +'+(+v.n)}); await b.commit(); toast('Stock updated');
   });
 }
 function addCustomer(){
@@ -351,13 +364,13 @@ function addCustomer(){
 function receive(id){
   const c=S.customers.find(x=>x.id===id);
   sheet(`Payment from ${esc(c.name)} (owes ${K(c.owed)})`,[{k:'amt',label:'Amount received (K)',type:'number'}], async v=>{
-    const a=+v.amt; if(!a||a>c.owed) return toast('Amount must be up to '+K(c.owed)), false;
+    const a=+v.amt; if(!(a>0)||a>c.owed) return toast('Amount must be up to '+K(c.owed)), false;
     const b=writeBatch(db); b.update(docRef('customers',id),{owed:inc(-a)});
     b.set(doc(col('payments')),{t:Date.now(),cid:id,cname:c.name,amt:a}); await b.commit(); toast('Payment recorded');
   },'Record payment');
 }
 function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
-window.A={delAcct:()=>askOwner(deleteAccount),gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v; if(access().ok){ started=false; startData(); } render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+window.A={delSale,delAcct:()=>askOwner(deleteAccount),gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v; if(access().ok){ started=false; startData(); } render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
 const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
@@ -375,13 +388,13 @@ function render(){
   if(ac.ok && !localStorage.getItem('zenta_guide_'+uid) && $('guide').style.display!=='block') showGuide(0);
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.t===tab));
   const tSales=S.sales.filter(inR), tExp=S.expenses.filter(inR), pl=PER.find(p=>p[0]===per)[1];
-  const sales=sum(tSales,s=>s.total), exp=sum(tExp,e=>e.amt), owed=sum(S.customers,c=>c.owed), stockV=sum(S.products,p=>p.qty*p.cost);
+  const cogs=s=>(+s.qty||0)*(s.cost!==undefined?s.cost:((S.products.find(p=>p.name===s.item)||{}).cost||0)), cg=sum(tSales,cogs), sales=sum(tSales,s=>s.total), exp=sum(tExp,e=>e.amt), owed=sum(S.customers,c=>c.owed), stockV=sum(S.products,p=>p.qty*p.cost);
   const low=S.products.filter(p=>p.qty<=(p.low??3));
   const titles={dash:'Today',sales:'Sales',exp:'Expenses',stock:'Stock',cust:'Customers & Nkongole',more:'Cash flow & more'};
   $('ttl').textContent=titles[tab]; let h='';
   if(tab==='dash') h=`<div class="hero"><small style="opacity:.75">Sales · ${pl}</small><div class="big">${K(sales)}</div></div>
     <div>${perSel()}</div><div class="grid"><div class="stat"><small>Expenses</small><b>${K(exp)}</b></div>
-    <div class="stat"><small>Profit (sales − expenses)</small><b>${K(sales-exp)}</b></div>
+    <div class="stat"><small>Profit (after cost of goods)</small><b>${K(sales-cg-exp)}</b></div>
     <div class="stat"><small>Stock value</small><b>${K(stockV)}</b></div>
     <div class="stat cu"><small>Outstanding Nkongole</small><b>${K(owed)}</b></div></div>
     ${low.length?`<h2>Running low</h2>`+low.map(p=>`<div class="row"><span>${esc(p.name)}</span><span class="amt neg">${p.qty} left</span></div>`).join(''):''}
@@ -394,13 +407,13 @@ function render(){
     const cin=sum(tSales.filter(x=>x.mode!=='credit'),x=>x.total)+sum(S.payments.filter(inR),x=>x.amt);
     const rows=o=>Object.entries(o).sort((p,q)=>q[1]-p[1]).slice(0,6).map(([k,v])=>`<div class="row"><span>${esc(ML[k]||k)}</span><span class="amt">${K(v)}</span></div>`).join('')||'<div class="empty">Nothing yet.</div>';
     h=`${perSel()}<div class="grid"><div class="stat"><small>Sales</small><b>${K(sales)}</b></div><div class="stat"><small>Expenses</small><b>${K(exp)}</b></div>
-    <div class="stat"><small>Profit</small><b>${K(sales-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
+    <div class="stat"><small>Profit</small><b>${K(sales-cg-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
     <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
     <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.guide()">How to use Zenta</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.exportMenu()">Export to Excel (CSV)</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:14px"><a href="#" onclick="A.delAcct();return false" style="color:var(--red)">Delete my account</a></p><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
 }
-function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.receipt('${s.id}')">🧾</button> <button class="sec sm" onclick="A.del('sales','${s.id}')">✕</button></div></div>`; }
+function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.receipt('${s.id}')">🧾</button> <button class="sec sm" onclick="A.delSale('${s.id}')">✕</button></div></div>`; }
 
 $('mtn').textContent=PAY_MTN; $('air').textContent=PAY_AIRTEL;
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
