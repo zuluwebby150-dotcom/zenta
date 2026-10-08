@@ -1,9 +1,22 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function mine(uid) { return request.auth != null && request.auth.uid == uid; }
+    function admin() { return request.auth != null && request.auth.token.email == 'zuluwebby150@gmail.com'; }
+    function active(uid) {
+      let a = get(/databases/$(database)/documents/users/$(uid)/meta/account).data;
+      return request.time < a.start + duration.value(15, 'd') || ('paidUntil' in a && request.time < a.paidUntil);
+    }
+    match /users/{uid}/meta/account {
+      allow read: if mine(uid) || admin();
+      allow create: if mine(uid) && request.resource.data.keys().hasOnly(['start', 'phone', 'email']) && request.resource.data.start == request.time;
+      allow update: if (mine(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phone', 'email'])) || admin();
+    }
+    match /users/{uid}/{coll}/{id} {
+      allow read, write: if mine(uid) && coll != 'meta' && active(uid);
+    }
+    match /{path=**}/meta/{doc} {
+      allow read: if admin();
     }
   }
 }
