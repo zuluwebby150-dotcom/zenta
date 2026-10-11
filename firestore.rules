@@ -1,22 +1,73 @@
 rules_version = '2';
+
+// Deploy with:  firebase deploy --only firestore:rules
+// The admin account (ADMIN_EMAIL in index.html) MUST have a verified email,
+// otherwise the Admin screen cannot activate subscribers.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function mine(uid) { return request.auth != null && request.auth.uid == uid; }
-    function admin() { return request.auth != null && request.auth.token.email == 'zuluwebby150@gmail.com'; }
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'zuluwebby150@gmail.com';
+    }
+    function acct(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)/meta/account).data;
+    }
+    // Trial (15 days from server-recorded start) or paid. Uses server time, not the phone clock.
     function active(uid) {
-      let a = get(/databases/$(database)/documents/users/$(uid)/meta/account).data;
-      return request.time < a.start + duration.value(15, 'd') || ('paidUntil' in a && request.time < a.paidUntil);
+      return (acct(uid).get('paidUntil', request.time) > request.time)
+          || (request.time < acct(uid).start + duration.value(15, 'd'));
     }
+
+    // Subscription record: users can create it once and edit only phone/email.
+    // Only the admin can set paidUntil.
     match /users/{uid}/meta/account {
-      allow read: if mine(uid) || admin();
-      allow create: if mine(uid) && request.resource.data.keys().hasOnly(['start', 'phone', 'email']) && request.resource.data.start == request.time;
-      allow update: if (mine(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phone', 'email'])) || admin();
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['start', 'phone', 'email'])
+        && request.resource.data.start == request.time;
+      allow update: if (isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phone', 'email']))
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paidUntil']));
     }
-    match /users/{uid}/{coll}/{id} {
-      allow read, write: if mine(uid) && coll != 'meta' && active(uid);
-    }
+
+    // Lets the admin list all subscribers (collectionGroup('meta')).
     match /{path=**}/meta/{doc} {
-      allow read: if admin();
+      allow read: if isAdmin();
+    }
+
+    match /users/{uid}/private/{doc} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Sales are append-only: only the soft-delete flags may change afterwards.
+    match /users/{uid}/sales/{id} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid) && active(uid)
+        && request.resource.data.total is number && request.resource.data.total >= 0
+        && request.resource.data.qty is number && request.resource.data.qty > 0;
+      allow update: if isOwner(uid) && active(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'delAt']);
+    }
+
+    match /users/{uid}/expenses/{id} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid) && active(uid)
+        && request.resource.data.amt is number && request.resource.data.amt > 0;
+      allow update: if isOwner(uid) && active(uid);
+    }
+
+    // Other business data: owner can always read and delete (export, account deletion);
+    // creating or changing records needs an active trial or subscription.
+    match /users/{uid}/{coll}/{id} {
+      allow read, delete: if isOwner(uid)
+        && coll in ['products', 'customers', 'payments', 'stocklog'];
+      allow create, update: if isOwner(uid) && active(uid)
+        && coll in ['products', 'customers', 'payments', 'stocklog'];
     }
   }
 }

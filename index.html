@@ -3,73 +3,180 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0B4F3C">
+<meta name="theme-color" content="#F4F6F3">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zenta">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <title>Zenta Business</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#EDF1EE;--ink:#12211B;--mute:#5E6E66;--card:#fff;--g:#0B4F3C;--g2:#0F7B5C;--cu:#C4611F;--red:#B3261E;--line:#D9E0DB}
+:root{--bg:#F4F6F3;--ink:#10231B;--mute:#5B6B63;--card:#fff;--g:#0B4F3C;--g2:#0F6B50;--tint:#E3F1EA;--cu:#C4611F;--cutint:#FBEFE6;--cuink:#8A4310;--red:#B3261E;--line:#DCE3DE;--r:20px;--sh:0 10px 30px rgba(16,35,27,.12)}
 *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
-body{font:16px/1.4 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:78px}
+html{-webkit-text-size-adjust:100%}
+body{font:16px/1.4 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 104px);overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 h1,h2,h3,.big{font-family:'Bricolage Grotesque',Figtree,sans-serif}
-header{background:var(--g);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 16px) 18px 22px}
-header small{opacity:.75}header h1{font-size:22px;font-weight:800}
-main{padding:14px 16px}
-.hero{background:var(--g);color:#fff;margin:-1px -16px 14px;padding:0 18px 22px}
-.hero .big{font-size:40px;font-weight:800}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.stat{background:var(--card);border-radius:14px;padding:12px;border:1px solid var(--line)}
-.stat small{color:var(--mute)}.stat b{display:block;font:700 20px 'Bricolage Grotesque',sans-serif;margin-top:2px}
-.cu b{color:var(--cu)}
-h2{font-size:18px;margin:14px 0 8px}
-.row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center}
-.row small{color:var(--mute);display:block}
-.amt{font-weight:600;white-space:nowrap}.neg{color:var(--red)}.cr{color:var(--cu)}
-button,.btn{font:600 16px Figtree,sans-serif;border:0;border-radius:12px;padding:12px 16px;background:var(--g2);color:#fff}
-button.sec{background:#fff;color:var(--g);border:1px solid var(--g)}
-button.sm{padding:7px 11px;font-size:14px}
-.fab{position:fixed;right:16px;bottom:88px;border-radius:26px;box-shadow:0 4px 14px #0004}
-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
-nav a{flex:1;text-align:center;padding:10px 0;font-size:12px;color:var(--mute)}
-nav a.on{color:var(--g);font-weight:600;box-shadow:inset 0 3px var(--g)}
-nav a i{display:block;font-style:normal;font-size:20px}
-input,select{width:100%;font:16px Figtree,sans-serif;padding:12px;border:1px solid var(--line);border-radius:10px;margin:4px 0 10px;background:#fff}
-label{font-size:14px;color:var(--mute)}
-#sheet{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;z-index:9}
-#sheet .in{background:#fff;width:100%;border-radius:20px 20px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom,0px) + 18px);max-height:90%;overflow:auto}
-#login{min-height:100vh;background:var(--g);color:#fff;padding:60px 24px}
-#login h1{font-size:38px;font-weight:800}#login p{opacity:.8;margin:6px 0 28px}
-#login button{width:100%;background:#fff;color:var(--g)}
-.empty{text-align:center;color:var(--mute);padding:26px 10px}
-#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:20px;display:none;z-index:20}
+header{background:var(--bg);color:var(--ink);padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 6px;position:sticky;top:0;z-index:5}
+header small{color:var(--mute);font-size:13px;display:block}header h1{font-size:28px;font-weight:800;letter-spacing:-.01em}
+main{padding:10px 20px;max-width:640px;margin:0 auto}
+.hero{background:var(--g);color:#fff;margin:6px 0 12px;padding:22px;border-radius:26px}
+.hero small{opacity:.75;font-size:14px}
+.hero .big{font-size:46px;font-weight:800;line-height:1.1;margin-top:4px}
+.hero .sub{display:flex;gap:10px;margin-top:18px}
+.hero .sub div{flex:1;padding:12px;border-radius:16px;background:rgba(255,255,255,.12)}
+.hero .sub small{display:block;font-size:12px}.hero .sub b{font:700 19px 'Bricolage Grotesque',sans-serif}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.stat{background:var(--card);border-radius:var(--r);padding:14px;border:1px solid var(--line)}
+.stat small{color:var(--mute);font-size:12px}.stat b{display:block;font:700 19px 'Bricolage Grotesque',sans-serif;margin-top:2px}
+.stat.cu{background:var(--cutint);border-color:#F2D9C5}.stat.cu small,.cu b{color:var(--cuink)}
+h2{font-size:17px;margin:20px 0 10px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-bottom:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.row small{color:var(--mute);display:block;font-size:13px}
+.row>div:first-child{min-width:0;font-weight:600}
+.row>div:last-child{display:flex;align-items:center;gap:6px;flex:none}
+.amt{font-weight:700;white-space:nowrap}.neg{color:var(--red)}.cr{color:var(--cuink)}
+button,.btn{font:700 16px Figtree,sans-serif;border:0;border-radius:16px;padding:0 18px;min-height:52px;background:var(--g);color:#fff;cursor:pointer;transition:transform .12s ease,opacity .12s}
+button:active,.btn:active{transform:scale(.97);opacity:.9}
+button:disabled{opacity:.6}
+button.sec{background:var(--tint);color:var(--g)}
+button.sm{min-height:44px;min-width:44px;padding:0 12px;font-size:14px;border-radius:14px}
+button.sec.sm svg{display:block;margin:auto}
+.fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 100px);border-radius:28px;min-height:56px;padding:0 22px;background:var(--cu);box-shadow:0 10px 24px rgba(196,97,31,.35);z-index:4}
+nav{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:12px;right:12px;max-width:616px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:26px;box-shadow:var(--sh);display:flex;padding:6px;z-index:6}
+nav a{flex:1;text-align:center;padding:8px 0 6px;font-size:11px;font-weight:600;color:var(--mute);text-decoration:none;border-radius:18px;transition:background .15s,color .15s}
+nav a.on{color:var(--g);background:var(--tint);font-weight:700}
+nav a svg{display:block;margin:0 auto 2px}
+input,select{width:100%;font:16px Figtree,sans-serif;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:14px;margin:6px 0 14px;background:var(--bg);color:var(--ink);appearance:none;-webkit-appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%235B6B63' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+input:focus,select:focus{outline:2px solid var(--g);outline-offset:1px;background:#fff}
+.sel{width:auto;display:inline-block;min-height:44px;margin:0 0 12px;border-radius:22px;background-color:#fff;font-weight:600}
+label{font-size:13px;font-weight:600;color:var(--mute)}
+#sheet{position:fixed;inset:0;background:rgba(16,35,27,.45);display:none;align-items:flex-end;z-index:9}
+#sheet .in{background:#fff;width:100%;max-width:640px;margin:0 auto;border-radius:28px 28px 0 0;padding:22px 20px calc(env(safe-area-inset-bottom,0px) + 24px);max-height:92%;overflow:auto;position:relative;animation:up .22s ease-out}
+#sheet .in::before{content:"";display:block;width:40px;height:5px;border-radius:3px;background:#D3DAD5;margin:-12px auto 14px}
+#sheet h2{font-size:24px;font-weight:800;margin:0 0 14px}
+#sheet button{width:100%}#sheet .row button,#sheet .chip,#sheet .step button,#sheet .mi{width:auto}#sheet .step button{min-width:52px}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+#login{min-height:100vh;min-height:100dvh;background:var(--g);color:var(--ink);position:relative;overflow:hidden;display:flex;flex-direction:column}
+#login::before,#login::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.07);pointer-events:none}
+#login::before{width:300px;height:300px;top:-90px;right:-100px;animation:gdrift 8s ease-in-out infinite}
+#login::after{width:220px;height:220px;top:120px;left:-110px;animation:gdrift 10s ease-in-out infinite reverse}
+.lhero{position:relative;color:#fff;text-align:center;padding:calc(env(safe-area-inset-top,0px) + 44px) 24px 40px}
+.lmark{width:68px;height:68px;border-radius:22px;background:#fff;color:var(--g);font:800 40px 'Bricolage Grotesque',sans-serif;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;box-shadow:0 12px 30px rgba(0,0,0,.25);animation:gpop .5s cubic-bezier(.2,.9,.3,1.2) both}
+.lhero h1{font-size:34px;font-weight:800;letter-spacing:-.02em}.lhero p{opacity:.8;margin-top:4px}
+.lcard{position:relative;flex:1;background:#fff;border-radius:32px 32px 0 0;padding:26px 24px calc(env(safe-area-inset-bottom,0px) + 24px);animation:gup .45s ease-out both}
+.lcard>*{max-width:400px;margin-left:auto;margin-right:auto}
+.lseg{display:flex;background:var(--bg);border-radius:16px;padding:4px;margin-bottom:20px}
+.lseg button{flex:1;min-height:44px;background:transparent;color:var(--mute);border-radius:12px;font-size:15px}
+.lseg button.on{background:#fff;color:var(--g);box-shadow:0 2px 8px rgba(16,35,27,.12)}
+.lcard h2{font-size:22px;margin:0 auto 4px}.lsub{color:var(--mute);font-size:14px;margin-bottom:16px}
+.pwrap{position:relative}.pwrap input{padding-right:52px}
+.pwrap button{position:absolute;right:4px;top:10px;width:44px;min-height:44px;padding:0;background:transparent;color:var(--mute);display:flex;align-items:center;justify-content:center}
+#send,#signup{width:100%;margin-top:4px}
+#login[data-mode=in] .only-up,#login[data-mode=up] .only-in{display:none}
+.llink{display:block;text-align:center;margin-top:16px;color:var(--g);font-weight:600;font-size:15px;text-decoration:none;padding:8px}
+.lfoot{text-align:center;margin-top:12px;font-size:13px;color:var(--mute)}.lfoot a{color:inherit}
+.lperks{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:18px}.lperks span{font-size:12px;font-weight:600;color:var(--g);background:var(--tint);padding:6px 12px;border-radius:12px}
+.empty{text-align:center;color:var(--mute);padding:30px 10px}
+#toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:22px;display:none;z-index:40;max-width:90%;box-shadow:var(--sh);font-weight:600;font-size:14px;text-align:center}
+.mgroup{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.mi{display:flex;align-items:center;gap:12px;width:100%;background:none;color:var(--ink);border-radius:0;padding:10px 14px;min-height:60px;text-align:left;font-weight:600;border-bottom:1px solid #EDF0EC}
+.mi:last-child{border-bottom:0}.mi:active{background:var(--bg);transform:none}
+.mi-ic{width:40px;height:40px;border-radius:12px;background:var(--tint);color:var(--g);display:flex;align-items:center;justify-content:center;flex:none}
+.mi-t{flex:1;min-width:0}.mi-t small{display:block;color:var(--mute);font-weight:400;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mi>svg:last-child{color:var(--mute);flex:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 16px}
+.chip{min-height:44px;padding:0 16px;border-radius:14px;background:#fff;color:var(--ink);border:1px solid var(--line);font-size:14px}
+.chip.on{background:var(--g);color:#fff;border-color:var(--g)}
+.step{display:flex;align-items:center;gap:8px;margin:6px 0 14px}.step input{margin:0;text-align:center;font-weight:700;font-size:18px}
+.step button{min-width:52px;padding:0;font-size:22px;background:var(--tint);color:var(--g)}
+.full{position:fixed;inset:0;background:var(--g);color:#fff;overflow:auto;text-align:center;padding:calc(env(safe-area-inset-top,0px) + 56px) 24px 32px}
+.full>*{max-width:340px;margin-left:auto;margin-right:auto}#guide>.gw{max-width:380px}
+.full button{width:100%}.full .w{background:#fff;color:var(--g)}.full .o{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6)}
+#guide{--ga:#0B4F3C;--gb:#DDEFE6;--gs:#BFE3D2;background:var(--gb);color:var(--ink);padding:0;overflow:hidden;transition:background .4s ease}
+#guide>.gw{max-width:none;margin:0;height:100%;display:flex;flex-direction:column;text-align:center}
+.gstage{flex:1 1 auto;min-height:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(env(safe-area-inset-top,0px) + 56px) 28px 28px;overflow:hidden}
+.gstage>*{max-width:340px}
+.gtop{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);left:20px;right:20px;display:flex;justify-content:space-between;align-items:center;z-index:2;max-width:none!important}
+.gtop span{font-size:13px;font-weight:700;color:var(--ga);background:rgba(255,255,255,.7);padding:6px 12px;border-radius:14px}
+.gtop a{font-size:14px;font-weight:700;color:var(--ga);padding:10px 4px;min-height:44px;display:flex;align-items:center;text-decoration:none}
+.gb1,.gb2{position:absolute;border-radius:50%;background:var(--gs);z-index:0;transition:background .4s}
+.gb1{width:260px;height:260px;top:-70px;right:-80px;animation:gdrift 7s ease-in-out infinite}
+.gb2{width:200px;height:200px;bottom:-60px;left:-70px;animation:gdrift 9s ease-in-out infinite reverse}
+@keyframes gdrift{50%{transform:translate(14px,18px) scale(1.06)}}
+.gstage>.pop{position:relative;z-index:1;animation:gpop .5s cubic-bezier(.2,.9,.3,1.2) both;animation-delay:var(--d,0s)}
+@keyframes gpop{from{opacity:0;transform:translateY(22px) scale(.92)}to{opacity:1;transform:none}}
+.flt{animation:gpop .5s cubic-bezier(.2,.9,.3,1.2) both,gfloat 4s ease-in-out infinite;animation-delay:var(--d,0s),calc(var(--d,0s) + .6s)}
+@keyframes gfloat{50%{transform:translateY(-6px)}}
+.gpanel{flex:none;background:#fff;border-radius:32px 32px 0 0;padding:26px 24px calc(env(safe-area-inset-bottom,0px) + 22px);box-shadow:0 -10px 40px rgba(16,35,27,.1)}
+.gpanel>*{max-width:360px;margin-left:auto;margin-right:auto}
+.gpanel h1{font-size:27px;line-height:1.15;letter-spacing:-.01em;margin-bottom:8px;animation:gup .4s ease-out both}
+.gpanel p{color:var(--mute);font-size:16px;margin-bottom:18px;animation:gup .4s .06s ease-out both}
+@keyframes gup{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.dots{margin:0 0 18px}.dots i{display:inline-block;width:8px;height:8px;border-radius:4px;margin:0 3px;background:#D3DAD5;transition:width .25s,background .25s}.dots i.on{width:26px;background:var(--ga)}
+.gbtn button{width:100%;margin-top:8px;background:var(--ga);color:#fff}
+.gbtn button:first-child{margin-top:0}.gbtn button.o{background:transparent;color:var(--mute);min-height:46px;border:0}
+.gico{width:92px;height:92px;border-radius:30px;background:var(--ga);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 30px rgba(16,35,27,.25)}
+.gico.logo{width:116px;height:116px;border-radius:36px;font:800 66px 'Bricolage Grotesque',sans-serif}
+.gcard{width:100%;background:#fff;border-radius:22px;padding:4px 16px;text-align:left;box-shadow:0 14px 34px rgba(16,35,27,.16)}
+.grow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 0}.grow+.grow{border-top:1px solid #EDF0EC}
+.grow b{font-weight:700}.grow small{display:block;color:var(--mute);font-size:12px;font-weight:400}
+.gn{background:var(--tint);color:var(--g);font-weight:700;border-radius:10px;padding:4px 12px}.gn.low{background:#FBE4E2;color:var(--red)}
+.gtap{display:inline-flex;align-items:center;gap:8px;background:var(--ga);color:#fff;font-weight:700;padding:14px 26px;border-radius:28px;position:relative;box-shadow:0 10px 24px rgba(16,35,27,.25)}
+.gtap::after{content:"";position:absolute;inset:-6px;border-radius:34px;border:2px solid var(--ga);animation:gring 1.8s ease-out infinite}
+@keyframes gring{from{opacity:.7;transform:scale(.92)}to{opacity:0;transform:scale(1.2)}}
+.gchips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.gchips span{padding:10px 16px;border-radius:14px;background:#fff;font-weight:700;font-size:14px;color:var(--mute);box-shadow:0 4px 12px rgba(16,35,27,.08)}.gchips .on{background:var(--ga);color:#fff}
+.gmini{background:var(--ga);color:#fff;font-weight:700;font-size:13px;padding:8px 16px;border-radius:12px}
+.gtag{font-size:14px;font-weight:700;background:#fff;color:var(--ga);padding:9px 18px;border-radius:18px;box-shadow:0 4px 12px rgba(16,35,27,.08)}
+.ghero{width:100%;background:var(--ga);color:#fff;border-radius:26px;padding:22px;text-align:left;box-shadow:0 16px 36px rgba(16,35,27,.25)}
+.ghero small{opacity:.75}.ghero b{display:block;font:800 46px 'Bricolage Grotesque',sans-serif;line-height:1.1;margin:2px 0 14px}
+.ghero div{display:flex;gap:8px}.ghero span{flex:1;background:rgba(255,255,255,.14);border-radius:12px;padding:10px;font-weight:700;font-size:13px;text-align:center}
+.gbars{display:flex;align-items:flex-end;gap:8px;height:64px;width:100%;padding:0 6px}.gbars i{flex:1;border-radius:8px 8px 4px 4px;background:var(--ga);opacity:.85;transform-origin:bottom;animation:gbar .7s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes gbar{from{transform:scaleY(.1)}}
+.gpin{display:flex;gap:16px}.gpin i{width:22px;height:22px;border-radius:11px;background:var(--ga);animation:gpop .4s both}.gpin i.off{background:#fff;border:3px solid var(--ga)}
+@media(max-height:680px){.gpanel h1{font-size:23px}.gpanel p{font-size:15px;margin-bottom:12px}.gico{width:72px;height:72px}.gico.logo{width:90px;height:90px;font-size:52px}.gstage{gap:10px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div id="toast"></div>
-<div id="login" style="display:none">
-  <h1>Zenta</h1><p>Run your business from your phone. Sign in with your email.</p>
-  <div id="step1"><label style="color:#fff">Email</label><input id="em" type="email" autocomplete="email">
-    <label style="color:#fff">Password (6+ characters)</label><input id="pw" type="password" autocomplete="current-password">
-    <label style="color:#fff">Phone number (needed when creating an account)</label><input id="ph" type="tel" value="+260" inputmode="tel">
-    <button id="send">Sign in</button>
-    <button id="signup" style="margin-top:10px;background:transparent;color:#fff;border:1px solid #fff">Create account</button>
-    <p style="text-align:center;margin-top:16px"><a href="#" id="forgot" style="color:#fff">Forgot password?</a></p><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p></div>
+<div id="login" data-mode="in" style="display:none">
+  <div class="lhero"><div class="lmark">Z</div><h1>Zenta</h1><p>Run your shop from your phone</p></div>
+  <div class="lcard" id="step1">
+    <div class="lseg" role="tablist"><button type="button" id="tin" class="on" role="tab">Sign in</button><button type="button" id="tup" role="tab">Create account</button></div>
+    <h2 class="only-in">Welcome back</h2><p class="lsub only-in">Sign in to see today's sales.</p>
+    <h2 class="only-up">Start your free trial</h2><p class="lsub only-up">15 days free. No card needed.</p>
+    <label for="em">Email</label><input id="em" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com">
+    <label for="pw">Password <span class="only-up">(6+ characters)</span></label>
+    <div class="pwrap"><input id="pw" type="password" autocomplete="current-password" placeholder="Your password"><button type="button" id="eye" aria-label="Show password"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+    <div class="only-up"><label for="ph">Phone number</label><input id="ph" type="tel" value="+260" inputmode="tel"></div>
+    <button id="send" class="only-in">Sign in</button>
+    <button id="signup" class="only-up">Create my account</button>
+    <a href="#" id="forgot" class="llink only-in">Forgot password?</a>
+    <div class="lperks only-up" style="margin-top:16px"><span>Sales</span><span>Stock</span><span>Nkongole</span><span>Works offline</span></div>
+    <p class="lfoot">By continuing you agree to our <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.</p>
+  </div>
 </div>
 <div id="app" style="display:none">
   <header><small id="biz">Zenta Business</small><h1 id="ttl">Today</h1></header>
   <main id="view"></main>
-  <nav id="nav"></nav>
+  <nav id="nav" aria-label="Main"></nav>
 </div>
-<div id="lock" style="display:none;position:fixed;inset:0;z-index:15;background:var(--g);color:#fff;padding:60px 24px;overflow:auto">
+<div id="lock" class="full" style="display:none;z-index:15;text-align:left">
   <h1 style="font-size:30px">Your free trial has ended</h1>
   <p style="opacity:.85;margin:8px 0 18px">Your records are safe. Subscribe to keep using Zenta.</p>
-  <div class="stat" style="color:var(--ink);margin-bottom:14px"><small>Zenta Business</small><b>K100 per month</b>
+  <div class="stat" style="color:var(--ink);margin:0 auto 14px;padding:18px"><small>Zenta Business</small><b>K100 per month</b>
   <p style="margin-top:8px">Send K100 to:<br>MTN Money: <b id="mtn" style="display:inline"></b><br>Airtel Money: <b id="air" style="display:inline"></b></p>
   <p style="margin-top:8px">Use this as the payment reference: <b id="ref" style="display:inline"></b><br><small>We activate your account after your payment arrives.</small></p></div>
-  <button class="sec" onclick="A.out()" style="width:100%">Sign out</button></div>
-<div id="guide" style="display:none;position:fixed;inset:0;z-index:25;background:var(--g);color:#fff;padding:70px 24px;text-align:center;overflow:auto"></div>
-<div id="pinlock" style="display:none;position:fixed;inset:0;z-index:30;background:var(--g);color:#fff;padding:90px 24px;text-align:center">
+  <button class="o" onclick="A.out()">Sign out</button></div>
+<div id="guide" class="full" style="display:none;z-index:25;max-width:none;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px)"></div>
+<div id="pinlock" class="full" style="display:none;z-index:30;padding-top:120px">
   <h1 style="font-size:30px">Enter your PIN</h1><p style="opacity:.8;margin:6px 0 20px">4-digit PIN</p>
   <input id="pinin" type="password" inputmode="numeric" maxlength="4" style="text-align:center;font-size:30px;letter-spacing:14px;max-width:220px">
   <p id="pinmsg" style="min-height:24px"></p><p style="margin-top:20px"><a href="#" id="pinforgot" style="color:#fff">Forgot PIN? Sign out</a></p></div>
@@ -77,7 +184,7 @@ label{font-size:14px;color:var(--mute)}
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,EmailAuthProvider,reauthenticateWithCredential,deleteUser,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,EmailAuthProvider,reauthenticateWithCredential,deleteUser,sendEmailVerification,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,setDoc,updateDoc,deleteDoc,writeBatch,onSnapshot,query,orderBy,limit,where,increment,serverTimestamp,collectionGroup,getDocs,Timestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // ===== PASTE YOUR FIREBASE CONFIG HERE (Firebase Console > Project settings > Your apps > Web) =====
 const FIREBASE_CONFIG = {
@@ -99,6 +206,7 @@ const $ = id => document.getElementById(id);
 const K = n => 'K' + (Math.round((+n||0)*100)/100).toLocaleString();
 const esc = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const inc = increment;
+const r2 = n => Math.round((+n||0)*100)/100;
 const toast = m => { const t=$('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2200); };
 const dstr = t => new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
 const dayStart = () => { const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); };
@@ -128,12 +236,16 @@ function range(){ const d=new Date(); d.setHours(0,0,0,0); const t=d.getTime(), 
   const m=new Date(d.getFullYear(),d.getMonth(),1).getTime();
   return per==='month'?[m,Infinity]:[new Date(d.getFullYear(),d.getMonth()-1,1).getTime(),m]; }
 const inR = x => { const [a,b]=range(); return x.t>=a && x.t<b; };
-const perSel = () => `<select onchange="A.per(this.value)">${PER.map(p=>`<option value="${p[0]}" ${p[0]===per?'selected':''}>${p[1]}</option>`).join('')}</select>`;
+const perSel = () => `<select class="sel" aria-label="Period" onchange="A.per(this.value)">${PER.map(p=>`<option value="${p[0]}" ${p[0]===per?'selected':''}>${p[1]}</option>`).join('')}</select>`;
 const col = n => collection(db,'users',uid,n);
 const docRef = (n,id) => doc(db,'users',uid,n,id);
 
 // ---------- Auth ----------
 const authErr = e => ({'auth/invalid-credential':'Wrong email or password','auth/user-not-found':'No account with this email','auth/wrong-password':'Wrong password','auth/email-already-in-use':'This email already has an account. Tap Sign in','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Check the email address','auth/too-many-requests':'Too many tries. Wait a few minutes','auth/missing-password':'Enter your password'}[e.code]||('Error: '+e.code));
+const setMode = m => { $('login').dataset.mode=m; $('tin').classList.toggle('on',m==='in'); $('tup').classList.toggle('on',m==='up'); $('pw').autocomplete=m==='in'?'current-password':'new-password'; };
+$('tin').onclick = () => setMode('in'); $('tup').onclick = () => setMode('up');
+$('eye').onclick = () => { const p=$('pw'), show=p.type==='password'; p.type=show?'text':'password'; $('eye').setAttribute('aria-label',show?'Hide password':'Show password'); $('eye').style.color=show?'var(--g)':''; };
+['em','pw','ph'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key==='Enter') ($('login').dataset.mode==='in'?$('send'):$('signup')).click(); }));
 $('send').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
 $('signup').onclick = async () => { const ph=$('ph').value.trim().replace(/\s/g,''); if(!/^\+260\d{9}$/.test(ph)) return toast('Phone must look like +260764173141');
   try{ localStorage.setItem('zenta_phone',ph); await createUserWithEmailAndPassword(auth,$('em').value.trim(),$('pw').value); }catch(e){ toast(authErr(e)); } };
@@ -142,7 +254,7 @@ $('forgot').onclick = async e => { e.preventDefault(); const m=$('em').value.tri
 onAuthStateChanged(auth, u => {
   unlocked=false; bad=0; ownerHash=''; settingsReady=false; bizName='';
   unsubs.forEach(f=>f()); unsubs=[]; dataUnsubs.forEach(f=>f()); dataUnsubs=[]; started=false; acct=null;
-  if(!u){ uid=null; $('app').style.display='none'; $('login').style.display='block'; return; }
+  if(!u){ uid=null; $('app').style.display='none'; $('login').style.display='flex'; return; }
   uid=u.uid; $('login').style.display='none'; $('app').style.display='block';
   watchAcct(); watchSettings();
   buildNav(); render();
@@ -152,7 +264,7 @@ function sheet(title, fields, onSave, saveLabel='Save'){
   $('sin').innerHTML = `<h2 style="margin-top:0">${title}</h2>` + fields.map(f =>
     `<label>${f.label}</label>` + (f.opts
       ? `<select id="f_${f.k}">${f.opts.map(o=>`<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select>`
-      : `<input id="f_${f.k}" type="${f.type||'text'}" ${f.type==='number'?'inputmode="decimal"':''} value="${esc(f.v??'')}">`)).join('') +
+      : `<input id="f_${f.k}" type="${f.type||'text'}" ${f.type==='number'?'inputmode="decimal" min="0" step="any"':''} value="${esc(f.v??'')}">`)).join('') +
     `<button id="ok" style="width:100%">${saveLabel}</button><button class="sec" id="no" style="width:100%;margin-top:8px">Cancel</button>`;
   $('sheet').style.display='flex';
   $('no').onclick = closeSheet;
@@ -188,8 +300,8 @@ let unlocked=false, bad=0, hiddenAt=0;
 function checkPin(){ const need=uid && localStorage.getItem(pinKey()) && !unlocked; $('pinlock').style.display=need?'block':'none';
   if(need){ $('pinin').value=''; setTimeout(()=>$('pinin').focus(),50); } }
 $('pinin').oninput = async () => { const v=$('pinin').value; if(v.length<4) return;
-  if(await hash(v)===localStorage.getItem(pinKey())){ unlocked=true; bad=0; $('pinmsg').textContent=''; checkPin(); }
-  else { bad++; $('pinin').value=''; if(bad>=5){ localStorage.removeItem(pinKey()); signOut(auth); } else $('pinmsg').textContent='Wrong PIN. '+(5-bad)+' tries left'; } };
+  if(await hash(v)===localStorage.getItem(pinKey())){ unlocked=true; bad=0; localStorage.removeItem('zenta_bad'); $('pinmsg').textContent=''; checkPin(); }
+  else { bad=(+localStorage.getItem('zenta_bad')||0)+1; localStorage.setItem('zenta_bad',bad); $('pinin').value=''; if(bad>=5){ localStorage.removeItem(pinKey()); localStorage.removeItem('zenta_bad'); signOut(auth); } else $('pinmsg').textContent='Wrong PIN. '+(5-bad)+' tries left'; } };
 $('pinforgot').onclick = e => { e.preventDefault(); localStorage.removeItem(pinKey()); unlocked=false; signOut(auth); };
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden && uid && started){ const [x]=range(); if(loadedFor!==per+':'+x){ started=false; startData(); } } });
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) hiddenAt=Date.now(); else if(hiddenAt && Date.now()-hiddenAt>30000){ unlocked=false; checkPin(); } });
@@ -244,7 +356,7 @@ const cRows = () => list(S.customers.filter(c=>has(c.name,q)||has(c.phone,q)),c=
 function editProduct(id){ const p=S.products.find(x=>x.id===id);
   sheet('Edit product',[{k:'name',label:'Name',v:p.name},{k:'qty',label:'Quantity in stock',type:'number',v:p.qty},{k:'cost',label:'Cost price (K)',type:'number',v:p.cost},{k:'price',label:'Selling price (K)',type:'number',v:p.price},{k:'low',label:'Warn me when stock is at or below',type:'number',v:p.low??3}], async v=>{
     if(!v.name) return toast('Enter a name'), false;
-    const nq=+v.qty||0,nc=+v.cost||0,np=+v.price||0,ch=[];
+    const nq=+v.qty||0,nc=+v.cost||0,np=+v.price||0,ch=[]; if(nq<0||nc<0||np<0) return toast('Numbers cannot be negative'), false;
     if(v.name!==p.name) ch.push('name: '+p.name+' → '+v.name); if(nq!==p.qty) ch.push('quantity: '+p.qty+' → '+nq);
     if(nc!==p.cost) ch.push('cost: '+K(p.cost)+' → '+K(nc)); if(np!==p.price) ch.push('price: '+K(p.price)+' → '+K(np));
     const b=writeBatch(db); b.update(docRef('products',id),{name:v.name,qty:nq,cost:nc,price:np,low:+v.low||0});
@@ -284,17 +396,33 @@ async function exportCsv(kind){
   const file=new File([csvText(rows)],'zenta-'+kind+(kind==='stock'?'':'-'+per)+'.csv',{type:'text/csv'});
   if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:file.name}); return; }catch(e){ if(e.name==='AbortError') return; } }
   const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); toast('Saved to Downloads'); }
-const GUIDE=[['👋','Welcome to Zenta','Run your shop from your phone. This takes one minute. You have 15 days free.'],
-['📦','1. Add your products','Go to Stock and tap + Product. Enter the name, how many you have, what you paid and your selling price.'],
-['💰','2. Record every sale','Go to Sales and tap + Sale. Pick the product and how they paid. Stock goes down by itself. Choose Nkongole if they will pay later.'],
-['📊','3. See how you are doing','Home shows sales, expenses and profit. The More tab has reports, receipts and Excel export.'],
-['🔐','Protect your records','In More, set an owner PIN so only you can edit or delete. Set an app PIN to lock this phone.']];
-function showGuide(i){ const [e,t,x]=GUIDE[i], last=i===GUIDE.length-1, b='width:100%;max-width:320px;';
-  const dots=GUIDE.map((_,k)=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 4px;background:#fff;opacity:'+(k===i?1:.35)+'"></span>').join('');
-  $('guide').innerHTML='<div style="font-size:64px">'+e+'</div><h1 style="font-size:28px;margin:12px 0 8px">'+t+'</h1><p style="opacity:.9;max-width:320px;margin:0 auto 22px">'+x+'</p><div style="margin-bottom:22px">'+dots+'</div>'+
-   (last?'<button style="'+b+'background:#fff;color:var(--g)" onclick="A.gend(true)">Add my first product</button><br><br><button style="'+b+'background:transparent;color:#fff;border:1px solid #fff" onclick="A.gend(false)">I will look around</button>'
-    :'<button style="'+b+'background:#fff;color:var(--g)" onclick="A.gnav('+(i+1)+')">Next</button>'+(i?'<br><br><button style="'+b+'background:transparent;color:#fff;border:1px solid #fff" onclick="A.gnav('+(i-1)+')">Back</button>':'')+'<p style="margin-top:22px"><a href="#" style="color:#fff" onclick="A.gend(false);return false">Skip</a></p>');
-  $('guide').style.display='block'; $('guide').scrollTop=0; }
+const ci=(p,w=44)=>`<svg aria-hidden="true" width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const GUIDE=[
+ {c:['#0B4F3C','#DDEFE6','#BFE3D2'],t:'Welcome to Zenta',x:'Run your shop from your phone. Setup takes one minute, and your first 15 days are free.',
+  art:()=>`<div class="gico logo pop flt">Z</div><div class="gtag pop" style="--d:.15s">15 days free</div><div class="gchips pop" style="--d:.25s"><span class="on">Sales</span><span>Stock</span><span>Nkongole</span></div>`},
+ {c:['#0F7B8A','#DDF1F3','#BCE3E8'],t:'1. Add your products',x:'Open Stock and tap + Product. Enter the name, how many you have, what you paid and your selling price.',
+  art:()=>`<div class="gcard pop flt"><div class="grow"><div><b>Cooking oil</b><small>Cost K70 · Sells K90</small></div><span class="gn">24</span></div><div class="grow"><div><b>Sugar</b><small>Cost K25 · Sells K30</small></div><span class="gn low">2 left</span></div></div><div class="gtap pop" style="--d:.2s">${ci('<path d="M12 5v14M5 12h14"/>',18)}Product</div>`},
+ {c:['#C4611F','#FBEADD','#F5D3B8'],t:'2. Record every sale',x:'Open Sales and tap + Sale. Pick the product and how they paid. Your stock goes down by itself.',
+  art:()=>`<div class="gcard pop flt"><div class="grow"><div><b>Cooking oil × 2</b><small>Today · just now</small></div><b>K180</b></div></div><div class="gchips pop" style="--d:.15s"><span class="on">Cash</span><span>MTN</span><span>Airtel</span><span>Nkongole</span></div><div class="gtap pop" style="--d:.25s">Save sale · K180</div>`},
+ {c:['#8A4310','#FBEFE6','#F2D9C5'],t:'3. Track Nkongole',x:'Customer will pay later? Choose Nkongole when you record the sale. When they pay, tap Paid on their name.',
+  art:()=>`<div class="gcard pop flt"><div class="grow"><div><b>Bwalya</b><small>0977 000 000</small></div><div style="display:flex;align-items:center;gap:10px"><b style="color:var(--cuink)">K120</b><span class="gmini">Paid</span></div></div><div class="grow"><div><b>Mutale</b><small>0966 000 000</small></div><b style="color:var(--cuink)">K45</b></div></div><div class="gtag pop" style="--d:.2s">Owed money is never forgotten</div>`},
+ {c:['#0B4F3C','#DDEFE6','#BFE3D2'],t:'4. See how you are doing',x:'Home shows your sales, expenses and profit for today, this week or this month. More has reports and Excel export.',
+  art:()=>`<div class="ghero pop flt"><small>Sales today</small><b>K2,450</b><div><span>Profit K860</span><span>Expenses K320</span></div></div><div class="gbars pop" style="--d:.2s">${[40,62,48,80,100,70,90].map((h,k)=>`<i style="height:${h}%;animation-delay:${.3+k*.06}s"></i>`).join('')}</div>`},
+ {c:['#6B4A9E','#EEE8F7','#DDD0EF'],t:'Protect your records',x:'In More, set an owner PIN so only you can edit or delete, and an app PIN to lock this phone.',
+  art:()=>`<div class="gico pop flt">${ci('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>')}</div><div class="gpin">${[0,1,2,3].map(k=>`<i class="${k>2?'off':''}" style="animation-delay:${.2+k*.12}s"></i>`).join('')}</div><div class="gtag pop" style="--d:.3s">Staff can sell, but only you can delete</div>`}];
+let gi=0;
+function showGuide(i){ gi=i; const g=GUIDE[i], last=i===GUIDE.length-1, n=GUIDE.length, G=$('guide');
+  G.style.setProperty('--ga',g.c[0]); G.style.setProperty('--gb',g.c[1]); G.style.setProperty('--gs',g.c[2]);
+  const dots=GUIDE.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('');
+  G.innerHTML=`<div class="gw"><div class="gstage"><i class="gb1"></i><i class="gb2"></i><div class="gtop"><span>${i+1} of ${n}</span>${last?'<span style="visibility:hidden"></span>':'<a href="#" onclick="A.gend(false);return false">Skip</a>'}</div>${g.art()}</div>
+   <div class="gpanel"><h1>${g.t}</h1><p>${g.x}</p><div class="dots">${dots}</div>
+   <div class="gbtn">`+(last?`<button onclick="A.gend(true)">Add my first product</button><button class="o" onclick="A.gend(false)">I will look around</button>`
+    :`<button onclick="A.gnav(${i+1})">${i?'Next':'Get started'}</button>`+(i?`<button class="o" onclick="A.gnav(${i-1})">Back</button>`:''))+`</div></div></div>`;
+  G.style.display='block'; }
+(()=>{ let x0=null; const el=$('guide');
+  el.addEventListener('touchstart',e=>{ x0=e.touches[0].clientX; },{passive:true});
+  el.addEventListener('touchend',e=>{ if(x0===null) return; const d=e.changedTouches[0].clientX-x0; x0=null;
+    if(d<-60 && gi<GUIDE.length-1) showGuide(gi+1); else if(d>60 && gi>0) showGuide(gi-1); },{passive:true}); })();
 function endGuide(go){ localStorage.setItem('zenta_guide_'+uid,'1'); $('guide').style.display='none'; if(go){ tab='stock'; render(); addProduct(); } }
 function deleteAccount(){
   sheet('Delete my account',[{k:'pw',label:'This permanently deletes ALL your records. Enter your password to confirm',type:'password'}], async v=>{
@@ -310,6 +438,13 @@ const closeSheet = () => $('sheet').style.display='none';
 $('sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 
 // ---------- Actions ----------
+function chipify(id){ const sel=$(id); sel.style.display='none';
+  const w=document.createElement('div'); w.className='chips'; sel.after(w);
+  const draw=()=>{ w.innerHTML=[...sel.options].map(o=>`<button type="button" class="chip ${o.value===sel.value?'on':''}" data-v="${esc(o.value)}">${esc(o.text)}</button>`).join(''); };
+  w.onclick=e=>{ const b=e.target.closest('.chip'); if(b){ sel.value=b.dataset.v; draw(); } }; draw(); }
+function stepify(id){ const inp=$(id), w=document.createElement('div'); w.className='step'; inp.before(w);
+  const m=document.createElement('button'), p=document.createElement('button'); m.type=p.type='button'; m.textContent='−'; p.textContent='+'; m.setAttribute('aria-label','Less'); p.setAttribute('aria-label','More');
+  w.append(m,inp,p); m.onclick=()=>{ inp.value=Math.max(1,(+inp.value||1)-1); }; p.onclick=()=>{ inp.value=(+inp.value||0)+1; }; }
 function addSale(){
   sheet('New sale',[
     {k:'pid',label:'Product',opts:[['','Other item (type below)'],...S.products.map(p=>[p.id,`${p.name} (${p.qty} left)`])]},
@@ -323,13 +458,14 @@ function addSale(){
     if(!(qty>0)||!(price>0)) return toast('Quantity and price must be more than 0'), false;
     if(v.mode==='credit' && !v.cid) return toast('Choose a customer for Nkongole'), false;
     if(p && qty>p.qty && !confirm(`Only ${p.qty} in stock. Continue?`)) return false;
-    const total=qty*price, c=S.customers.find(x=>x.id===v.cid);
+    const total=r2(qty*price), c=S.customers.find(x=>x.id===v.cid);
     const b=writeBatch(db);
     b.set(doc(col('sales')),{t:Date.now(),item:p?p.name:(v.item||'Sale'),qty,price,total,mode:v.mode,cid:v.cid||'',cname:c?c.name:'',pid:p?p.id:'',cost:p?p.cost:0});
     if(p) b.update(docRef('products',p.id),{qty:inc(-qty)});
     if(v.mode==='credit') b.update(docRef('customers',v.cid),{owed:inc(total)});
     await b.commit(); toast('Sale saved');
   });
+  chipify('f_mode'); stepify('f_qty');
   const sel=$('f_pid'); sel.insertAdjacentHTML('beforebegin','<input id="ps" placeholder="Type to search products">');
   const fill=t=>{ const m=S.products.filter(p=>p.name.toLowerCase().includes(t.toLowerCase()));
     sel.innerHTML='<option value="">Other item (type below)</option>'+m.map(p=>`<option value="${p.id}">${esc(p.name)} (${p.qty} left)</option>`).join(''); if(t&&m.length){ sel.value=m[0].id; sel.onchange(); } };
@@ -364,17 +500,25 @@ function addCustomer(){
 function receive(id){
   const c=S.customers.find(x=>x.id===id);
   sheet(`Payment from ${esc(c.name)} (owes ${K(c.owed)})`,[{k:'amt',label:'Amount received (K)',type:'number'}], async v=>{
-    const a=+v.amt; if(!(a>0)||a>c.owed) return toast('Amount must be up to '+K(c.owed)), false;
+    const a=r2(v.amt); if(!(a>0)||a>c.owed) return toast('Amount must be up to '+K(c.owed)), false;
     const b=writeBatch(db); b.update(docRef('customers',id),{owed:inc(-a)});
     b.set(doc(col('payments')),{t:Date.now(),cid:id,cname:c.name,amt:a}); await b.commit(); toast('Payment recorded');
   },'Record payment');
 }
 function del(name,id){ askOwner(()=>{ if(confirm('Move this entry to Deleted? You can restore it later.')) updateDoc(docRef(name,id),{deleted:true,delAt:Date.now()}); }); }
-window.A={delSale,delAcct:()=>askOwner(deleteAccount),gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v; if(access().ok){ started=false; startData(); } render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
+let deferred=null; addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferred=e; });
+const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+const installBtn=()=>standalone()?'':'<button class="sec" style="width:100%;margin-bottom:10px" onclick="A.install()">Install Zenta on this phone</button>';
+function install(){ if(deferred){ deferred.prompt(); deferred=null; return; }
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  $('sin').innerHTML='<h2 style="margin-top:0">Install Zenta</h2><p style="margin-bottom:14px">'+(ios?'Tap the <b>Share</b> button in Safari, then <b>Add to Home Screen</b>.':'Open the browser menu (⋮) and tap <b>Install app</b> or <b>Add to Home screen</b>.')+'</p><button class="sec" style="width:100%" onclick="A.close()">Close</button>'; $('sheet').style.display='flex'; }
+const verify=()=>sendEmailVerification(auth.currentUser).then(()=>toast('Verification email sent. Open the link, then sign in again')).catch(e=>toast('Error: '+e.code));
+window.A={install,verify,delSale,delAcct:()=>askOwner(deleteAccount),gnav:showGuide,gend:endGuide,guide:()=>showGuide(0),exportMenu:showExport,csv:exportCsv,receipt,setBiz,q:v=>{q=v; $('lst').innerHTML=tab==='stock'?pRows():cRows();},editProduct:id=>askOwner(()=>editProduct(id)),editCustomer,log:showLog,setPin,deleted:()=>askOwner(showDeleted),setOwner,restore,admin,extend,close:()=>closeSheet(),per:v=>{per=v; if(access().ok){ started=false; startData(); } render();},addSale,addExpense,addProduct,restock,addCustomer,receive,del,out:()=>signOut(auth)};
 
 // ---------- Views ----------
-const tabs=[['dash','🏠','Home'],['sales','💰','Sales'],['exp','💸','Expenses'],['stock','📦','Stock'],['cust','👥','Nkongole'],['more','⋯','More']];
-function buildNav(){ $('nav').innerHTML=tabs.map(t=>`<a href="#" data-t="${t[0]}"><i>${t[1]}</i>${t[2]}</a>`).join('');
+const TI={dash:`<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>`,sales:`<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>`,exp:`<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>`,stock:`<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>`,cust:`<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14a6.5 6.5 0 013.5 6"/></svg>`,more:`<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>`};
+const tabs=[['dash','Home'],['sales','Sales'],['exp','Expenses'],['stock','Stock'],['cust','Nkongole'],['more','More']];
+function buildNav(){ $('nav').innerHTML=tabs.map(t=>`<a href="#" data-t="${t[0]}">${TI[t[0]]}${t[1]}</a>`).join('');
   $('nav').onclick=e=>{const a=e.target.closest('a'); if(a){e.preventDefault(); tab=a.dataset.t; q=''; render();}}; }
 const sum=(a,f)=>a.reduce((s,x)=>s+(+f(x)||0),0);
 const list=(a,fn,msg)=>a.length?a.map(fn).join(''):`<div class="empty">${msg}</div>`;
@@ -392,28 +536,35 @@ function render(){
   const low=S.products.filter(p=>p.qty<=(p.low??3));
   const titles={dash:'Today',sales:'Sales',exp:'Expenses',stock:'Stock',cust:'Customers & Nkongole',more:'Cash flow & more'};
   $('ttl').textContent=titles[tab]; let h='';
-  if(tab==='dash') h=`<div class="hero"><small style="opacity:.75">Sales · ${pl}</small><div class="big">${K(sales)}</div></div>
-    <div>${perSel()}</div><div class="grid"><div class="stat"><small>Expenses</small><b>${K(exp)}</b></div>
-    <div class="stat"><small>Profit (after cost of goods)</small><b>${K(sales-cg-exp)}</b></div>
-    <div class="stat"><small>Stock value</small><b>${K(stockV)}</b></div>
+  if(tab==='dash') h=`<div>${perSel()}</div><div class="hero"><small>Sales · ${pl}</small><div class="big">${K(sales)}</div><div class="sub"><div><small>Profit</small><b>${K(sales-cg-exp)}</b></div><div><small>Expenses</small><b>${K(exp)}</b></div></div></div>
+    <div class="grid"><div class="stat"><small>Stock value</small><b>${K(stockV)}</b></div>
     <div class="stat cu"><small>Outstanding Nkongole</small><b>${K(owed)}</b></div></div>
     ${low.length?`<h2>Running low</h2>`+low.map(p=>`<div class="row"><span>${esc(p.name)}</span><span class="amt neg">${p.qty} left</span></div>`).join(''):''}
     <h2>Recent sales</h2>`+list(S.sales.slice(0,5),saleRow,'No sales yet. Tap Sales to record your first.');
   if(tab==='sales') h=perSel()+list(tSales,saleRow,'No sales in this period.')+fab('addSale','Sale');
-  if(tab==='exp') h=perSel()+list(tExp,e=>`<div class="row"><div>${esc(e.what)}<small>${dstr(e.t)}</small></div><div><span class="amt neg">${K(e.amt)}</span> <button class="sec sm" onclick="A.del('expenses','${e.id}')">✕</button></div></div>`,'No expenses yet.')+fab('addExpense','Expense');
+  if(tab==='exp') h=perSel()+list(tExp,e=>`<div class="row"><div>${esc(e.what)}<small>${dstr(e.t)}</small></div><div><span class="amt neg">${K(e.amt)}</span> <button class="sec sm" aria-label="Delete expense" onclick="A.del('expenses','${e.id}')" aria-label="Delete"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>`,'No expenses yet.')+fab('addExpense','Expense');
   if(tab==='stock') h=`<input id="q" placeholder="Search products" value="${esc(q)}" oninput="A.q(this.value)"><div id="lst">${pRows()}</div>`+fab('addProduct','Product');
   if(tab==='cust') h=`<input id="q" placeholder="Search customers" value="${esc(q)}" oninput="A.q(this.value)"><div id="lst">${cRows()}</div>`+fab('addCustomer','Customer');
   if(tab==='more'){ const by={}, prod={}; tSales.forEach(x=>{by[x.mode||'cash']=(by[x.mode||'cash']||0)+x.total; prod[x.item]=(prod[x.item]||0)+x.total;});
     const cin=sum(tSales.filter(x=>x.mode!=='credit'),x=>x.total)+sum(S.payments.filter(inR),x=>x.amt);
     const rows=o=>Object.entries(o).sort((p,q)=>q[1]-p[1]).slice(0,6).map(([k,v])=>`<div class="row"><span>${esc(ML[k]||k)}</span><span class="amt">${K(v)}</span></div>`).join('')||'<div class="empty">Nothing yet.</div>';
+    const I=p=>`<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    const item=(fn,ic,t,sub)=>`<button class="mi" onclick="${fn}"><span class="mi-ic">${I(ic)}</span><span class="mi-t">${t}${sub?`<small>${sub}</small>`:''}</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>`;
+    const nDel=Object.values(D).reduce((n,a)=>n+a.length,0);
     h=`${perSel()}<div class="grid"><div class="stat"><small>Sales</small><b>${K(sales)}</b></div><div class="stat"><small>Expenses</small><b>${K(exp)}</b></div>
     <div class="stat"><small>Profit</small><b>${K(sales-cg-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${K(cin-exp)}</b></div></div>
     <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
-    <p style="color:var(--mute);margin:12px 0">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
-    <button class="sec" style="width:100%;margin-bottom:10px" onclick="A.guide()">How to use Zenta</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.exportMenu()">Export to Excel (CSV)</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setBiz()">${bizName?'Business name: '+esc(bizName):'Set business name (for receipts)'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.log()">Stock changes</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.deleted()">Deleted entries (${Object.values(D).reduce((n,a)=>n+a.length,0)})</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setPin()">${localStorage.getItem(pinKey())?'Turn off app PIN':'Set app PIN'}</button><button class="sec" style="width:100%;margin-bottom:10px" onclick="A.setOwner()">${ownerHash?'Change or turn off owner PIN':'Set owner PIN (for deleting)'}</button>${isAdmin()?'<button style="width:100%;margin-bottom:10px" onclick="A.admin()">Admin: subscribers</button>':''}<button class="sec" style="width:100%" onclick="A.out()">Sign out</button><p style="text-align:center;margin-top:14px"><a href="#" onclick="A.delAcct();return false" style="color:var(--red)">Delete my account</a></p><p style="text-align:center;margin-top:16px;font-size:14px"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
+    <p style="color:var(--mute);margin:4px 0 0;font-size:13px">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
+    <h2>Business</h2><div class="mgroup">${item('A.setBiz()','<path d="M3 9l1-5h16l1 5M4 9v11h16V9M9 20v-6h6v6"/>','Business name',bizName?esc(bizName):'Shown on receipts')}${item('A.exportMenu()','<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>','Export to Excel','Sales, expenses, stock (CSV)')}${item('A.log()','<path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/>','Stock changes','History of edits and restocks')}${item('A.deleted()','<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>','Deleted entries',nDel+' item'+(nDel===1?'':'s')+' you can restore')}</div>
+    <h2>Security</h2><div class="mgroup">${item('A.setPin()','<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>','App PIN',localStorage.getItem(pinKey())?'On · tap to turn off':'Lock this phone with 4 digits')}${item('A.setOwner()','<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>','Owner PIN',ownerHash?'On · tap to change or turn off':'Only you can edit or delete')}</div>
+    <h2>Help</h2><div class="mgroup">${item('A.guide()','<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01"/>','How to use Zenta','Quick walkthrough')}${isAdmin()?item('A.admin()','<path d="M3 17l6-6 4 4 8-8"/>','Admin: subscribers',''):''}</div>
+    <div class="mgroup" style="margin-top:18px">${item('A.out()','<path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/>','Sign out','')}</div>
+    <p style="text-align:center;margin-top:18px"><a href="#" onclick="A.delAcct();return false" style="color:var(--red);font-size:14px">Delete my account</a></p><p style="text-align:center;margin-top:12px;font-size:14px;color:var(--mute)"><a href="privacy.html" style="color:inherit">Privacy</a> · <a href="terms.html" style="color:inherit">Terms</a></p>`; }
   $('view').innerHTML=h;
+  if(fq!==null&&$('q')){ $('q').focus(); try{ $('q').setSelectionRange(fq,fq); }catch(_){} }
+  scrollTo(0,y);
 }
-function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" onclick="A.receipt('${s.id}')">🧾</button> <button class="sec sm" onclick="A.delSale('${s.id}')">✕</button></div></div>`; }
+function saleRow(s){ return `<div class="row"><div>${esc(s.item)} × ${s.qty}<small>${dstr(s.t)} · ${ML[s.mode]||'Cash'}${s.mode==='credit'?' · <span class="cr">'+esc(s.cname)+'</span>':''}</small></div><div><span class="amt">${K(s.total)}</span> <button class="sec sm" aria-label="Receipt" onclick="A.receipt('${s.id}')" aria-label="Receipt"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></button> <button class="sec sm" aria-label="Delete sale" onclick="A.delSale('${s.id}')" aria-label="Delete"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>`; }
 
 $('mtn').textContent=PAY_MTN; $('air').textContent=PAY_AIRTEL;
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
