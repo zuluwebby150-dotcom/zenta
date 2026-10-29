@@ -1,6 +1,6 @@
 // Bump V only when you want to purge old caches; updates to files are picked up automatically.
-const V = 'zenta-v26';
-const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'privacy.html', 'terms.html'];
+const V = 'zenta-v27';
+const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/config.js', 'js/guide.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'privacy.html', 'terms.html'];
 const FIREBASE = ['app', 'auth', 'firestore'].map(n => `https://www.gstatic.com/firebasejs/10.12.2/firebase-${n}.js`);
 const NET_TIMEOUT = 4000; // on weak networks, fall back to cache after 4s
 

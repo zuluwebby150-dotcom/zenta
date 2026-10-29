@@ -1,0 +1,17 @@
+{
+  "name": "zenta",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "node --test test/backup.test.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project zenta-test \"node --test test/rules.test.mjs\"",
+    "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs",
+    "loadtest": "firebase emulators:exec --only firestore --project zenta-test \"node scripts/loadtest.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.1.0",
+    "firebase-admin": "^12.7.0"
+  }
+}

@@ -1,11 +1,13 @@
 rules_version = '2';
 
 // Deploy with:  firebase deploy --only firestore:rules
-// The admin account (ADMIN_EMAIL in index.html) MUST have a verified email,
+// Test with:    npm test   (runs test/rules.test.mjs against the local emulator)
+// The admin account (ADMIN_EMAIL in js/config.js) MUST have a verified email,
 // otherwise the Admin screen cannot activate subscribers.
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ---------- helpers ----------
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
     function isAdmin() {
@@ -13,26 +15,80 @@ service cloud.firestore {
         && request.auth.token.email_verified == true
         && request.auth.token.email == 'zuluwebby150@gmail.com';
     }
-    function acct(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)/meta/account).data;
+    function num(v, lo, hi) { return v is number && v >= lo && v <= hi; }
+    function str(v, max) { return v is string && v.size() <= max; }
+    function optStr(d, k, max) { return !(k in d) || str(d[k], max); }
+    function optNum(d, k, lo, hi) { return !(k in d) || num(d[k], lo, hi); }
+    // soft-delete flags: deleted is a bool, delAt a timestamp-in-ms or null
+    function flagsOk(d) {
+      return (!('deleted' in d) || d.deleted is bool)
+        && (!('delAt' in d) || d.delAt == null || num(d.delAt, 0, 9999999999999));
     }
-    // Trial (15 days from server-recorded start) or paid. Uses server time, not the phone clock.
-    function active(uid) {
-      return (acct(uid).get('paidUntil', request.time) > request.time)
-          || (request.time < acct(uid).start + duration.value(15, 'd'));
+    // the client clock may be a little off or a sale may sync late, but never wildly
+    function timeOk(t) {
+      return num(t, 1577836800000, request.time.toMillis() + 86400000);
     }
 
-    // Subscription record: users can create it once and edit only phone/email.
-    // Only the admin can set paidUntil.
+    // Trial (15 days from server-recorded start) or paid. Uses server time, not the phone clock.
+    // Accounts flagged noTrial (their phone or email already used a trial) only get paid time.
+    // Takes the account document itself, so each write costs exactly one read of it.
+    function activeOf(a) {
+      return a.data.get('paidUntil', request.time) > request.time
+          || (a.data.get('noTrial', false) != true && request.time < a.data.start + duration.value(15, 'd'));
+    }
+    function active(uid) {
+      return activeOf(get(/databases/$(database)/documents/users/$(uid)/meta/account));
+    }
+
+    // ---------- one free trial per phone / per mailbox ----------
+    // The phone is the document id; the email is normalised (gmail dots and +tags removed)
+    // so a@gmail.com, a.b@gmail.com and a+x@gmail.com count as one mailbox.
+    // Create-only: a key can never be reused, changed or deleted by clients.
+    function emailKey(e) {
+      let p = e.lower().split('@');
+      let local = p[0].split('[+]')[0];
+      let dom = p[1] == 'googlemail.com' ? 'gmail.com' : p[1];
+      return 'e_' + (dom == 'gmail.com' ? local.replace('[.]', '') : local) + '@' + dom;
+    }
+    function trialPath(key) { return /databases/$(database)/documents/trials/$(key); }
+    match /trials/{key} {
+      allow create: if signedIn()
+        && (key.matches('^p_[+]260[0-9]{9}$') || key.matches('^e_[^/]{3,200}$'))
+        && request.resource.data.keys().hasOnly(['uid', 't'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.t == request.time;
+    }
+
+    // Subscription record. Created once per user, either with a fresh trial (both trial keys
+    // are claimed in the same batch) or, if the phone/email already had a trial, with noTrial.
+    // Users can afterwards edit only phone/email. Only the admin can set paidUntil.
     match /users/{uid}/meta/account {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['start', 'phone', 'email'])
-        && request.resource.data.start == request.time;
+        && request.resource.data.keys().hasOnly(['start', 'phone', 'email', 'noTrial'])
+        && request.resource.data.start == request.time
+        && str(request.resource.data.phone, 30) && request.resource.data.phone.matches('^[+]260[0-9]{9}$')
+        && str(request.resource.data.email, 200)
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
+        && (
+          // fresh trial: both keys are created by this same batch for this user
+          (!('noTrial' in request.resource.data)
+            && getAfter(trialPath('p_' + request.resource.data.phone)).data.uid == request.auth.uid
+            && getAfter(trialPath(emailKey(request.auth.token.email))).data.uid == request.auth.uid
+            && !exists(trialPath('p_' + request.resource.data.phone))
+            && !exists(trialPath(emailKey(request.auth.token.email))))
+          ||
+          // trial already used by this phone or mailbox: subscription only
+          (request.resource.data.noTrial == true
+            && (exists(trialPath('p_' + request.resource.data.phone))
+                || exists(trialPath(emailKey(request.auth.token.email)))))
+        );
       allow update: if (isOwner(uid)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phone', 'email']))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phone', 'email'])
+          && str(request.resource.data.phone, 30) && str(request.resource.data.email, 200))
         || (isAdmin()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paidUntil']));
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paidUntil'])
+          && request.resource.data.paidUntil is timestamp);
     }
 
     // Lets the admin list all subscribers (collectionGroup('meta')).
@@ -40,34 +96,127 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
-    match /users/{uid}/private/{doc} {
-      allow read, write: if isOwner(uid);
+    match /users/{uid}/private/settings {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['owner', 'biz'])
+        && optStr(request.resource.data, 'owner', 64) && optStr(request.resource.data, 'biz', 80);
     }
 
-    // Sales are append-only: only the soft-delete flags may change afterwards.
+    // ---------- business data (only the owner, only while trial/paid is active) ----------
+    // Sales are append-only: after creation only the soft-delete flag and returnedQty may change.
+    // Return documents (ret == true) carry negative qty/total.
     match /users/{uid}/sales/{id} {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid) && active(uid)
-        && request.resource.data.total is number && request.resource.data.total >= 0
-        && request.resource.data.qty is number && request.resource.data.qty > 0;
+        && request.resource.data.keys().hasOnly(['t', 'item', 'qty', 'price', 'total', 'mode', 'cid', 'cname',
+             'pid', 'cost', 'packs', 'packPrice', 'ret', 'refOf', 'why', 'exWith', 'editOf', 'returnedQty'])
+        && request.resource.data.keys().hasAll(['t', 'item', 'qty', 'price', 'total', 'mode'])
+        && timeOk(request.resource.data.t)
+        && str(request.resource.data.item, 120)
+        && request.resource.data.mode in ['cash', 'mtn', 'airtel', 'bank', 'credit']
+        && num(request.resource.data.price, 0, 1000000)
+        && optNum(request.resource.data, 'cost', 0, 1000000)
+        && optNum(request.resource.data, 'packs', 0, 1000000)
+        && optNum(request.resource.data, 'packPrice', 0, 10000000)
+        && optStr(request.resource.data, 'cid', 40) && optStr(request.resource.data, 'cname', 120)
+        && optStr(request.resource.data, 'pid', 40) && optStr(request.resource.data, 'why', 300)
+        && optStr(request.resource.data, 'refOf', 40) && optStr(request.resource.data, 'exWith', 40)
+        && optStr(request.resource.data, 'editOf', 40)
+        && (
+          (!('ret' in request.resource.data)
+            && num(request.resource.data.qty, 1, 1000000)
+            && num(request.resource.data.total, 0, 10000000))
+          ||
+          (request.resource.data.get('ret', false) == true
+            && num(request.resource.data.qty, -1000000, -1)
+            && num(request.resource.data.total, -10000000, 0))
+        );
       allow update: if isOwner(uid) && active(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'delAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'delAt', 'returnedQty'])
+        && flagsOk(request.resource.data)
+        && request.resource.data.get('returnedQty', 0) >= 0
+        && (request.resource.data.get('ret', false) == true
+            || request.resource.data.get('returnedQty', 0) <= request.resource.data.qty);
     }
 
+    // Expenses are append-only too: amounts cannot be edited, only the soft-delete flag.
     match /users/{uid}/expenses/{id} {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid) && active(uid)
-        && request.resource.data.amt is number && request.resource.data.amt > 0;
-      allow update: if isOwner(uid) && active(uid);
+        && request.resource.data.keys().hasOnly(['t', 'what', 'amt'])
+        && request.resource.data.keys().hasAll(['t', 'what', 'amt'])
+        && timeOk(request.resource.data.t)
+        && str(request.resource.data.what, 120)
+        && num(request.resource.data.amt, 0.01, 10000000);
+      allow update: if isOwner(uid) && active(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'delAt'])
+        && flagsOk(request.resource.data);
     }
 
-    // Other business data: owner can always read and delete (export, account deletion);
-    // creating or changing records needs an active trial or subscription.
-    match /users/{uid}/{coll}/{id} {
-      allow read, delete: if isOwner(uid)
-        && coll in ['products', 'customers', 'payments', 'stocklog'];
+    // Stock may go a little negative (the app allows overselling with a confirm),
+    // so the floor is generous; the ceiling stops absurd values.
+    match /users/{uid}/products/{id} {
+      allow read, delete: if isOwner(uid);
       allow create, update: if isOwner(uid) && active(uid)
-        && coll in ['products', 'customers', 'payments', 'stocklog'];
+        && request.resource.data.keys().hasOnly(['t', 'name', 'qty', 'cost', 'price', 'pack', 'low', 'deleted', 'delAt'])
+        && request.resource.data.keys().hasAll(['name', 'qty', 'cost', 'price'])
+        && str(request.resource.data.name, 120) && request.resource.data.name.size() > 0
+        && num(request.resource.data.qty, -10000, 1000000)
+        && num(request.resource.data.cost, 0, 1000000)
+        && num(request.resource.data.price, 0, 1000000)
+        && optNum(request.resource.data, 'pack', 0, 100000)
+        && optNum(request.resource.data, 'low', 0, 1000000)
+        && optNum(request.resource.data, 't', 0, 9999999999999)
+        && flagsOk(request.resource.data);
     }
+
+    match /users/{uid}/customers/{id} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && active(uid)
+        && request.resource.data.keys().hasOnly(['t', 'name', 'phone', 'owed', 'deleted', 'delAt'])
+        && request.resource.data.keys().hasAll(['name', 'owed'])
+        && str(request.resource.data.name, 120) && request.resource.data.name.size() > 0
+        && optStr(request.resource.data, 'phone', 30)
+        && num(request.resource.data.owed, -10000, 10000000)
+        && optNum(request.resource.data, 't', 0, 9999999999999)
+        && flagsOk(request.resource.data);
+    }
+
+    // Payments received from customers (part-payments allowed). Append-only.
+    match /users/{uid}/payments/{id} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid) && active(uid)
+        && request.resource.data.keys().hasOnly(['t', 'cid', 'cname', 'amt', 'mode'])
+        && request.resource.data.keys().hasAll(['t', 'cid', 'amt'])
+        && timeOk(request.resource.data.t)
+        && str(request.resource.data.cid, 40) && optStr(request.resource.data, 'cname', 120)
+        && (!('mode' in request.resource.data) || request.resource.data.mode in ['cash', 'mtn', 'airtel', 'bank'])
+        && num(request.resource.data.amt, 0.01, 10000000);
+    }
+
+    match /users/{uid}/stocklog/{id} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid) && active(uid)
+        && request.resource.data.keys().hasOnly(['t', 'name', 'txt'])
+        && request.resource.data.keys().hasAll(['t', 'name', 'txt'])
+        && timeOk(request.resource.data.t)
+        && str(request.resource.data.name, 120) && str(request.resource.data.txt, 400);
+    }
+
+    // ---------- client error reports (written by the app, read only by the admin) ----------
+    match /errors/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 't', 'msg', 'src', 'ua', 'v'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.t == request.time
+        && str(request.resource.data.msg, 600)
+        && optStr(request.resource.data, 'src', 300)
+        && optStr(request.resource.data, 'ua', 200)
+        && optStr(request.resource.data, 'v', 40);
+      allow read, delete: if isAdmin();
+    }
+
+    // Everything else is closed.
   }
 }
