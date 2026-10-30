@@ -355,18 +355,20 @@ function addSale(){
     {k:'unit',label:'Selling by',opts:[['pc','Single pieces'],['pack','Whole packs (tray, carton)']]},
     {k:'qty',label:'Quantity',type:'number',v:1},
     {k:'price',label:'Price each (K)',type:'number'},
+    {k:'icost',label:'What did it cost you? (each). Type 0 if it cost nothing',type:'number'},
     {k:'cid',label:'Customer',opts:[['','Walk-in customer'],...S.customers.map(c=>[c.id,c.name])]},
     {k:'mode',label:'Payment',opts:[['cash','Cash'],['mtn','MTN Money'],['airtel','Airtel Money'],['bank','Bank'],['credit','Nkongole (pay later)']]}
   ], async v => {
     const p=S.products.find(x=>x.id===v.pid), packs=(v.unit==='pack'&&p&&p.pack>0)?+v.qty:0;
     if(v.unit==='pack'&&!packs) return toast('Choose a product that has a pack size. Edit the product and set the pieces in one pack.'), false;
+    if(!p && (v.icost===''||!(+v.icost>=0))) return toast('Enter what it cost you for each item, or 0 if it cost nothing'), false;
     const qty=packs?packs*p.pack:+v.qty, packPrice=packs?(+v.price||r2(p.price*p.pack)):0, price=packs?packPrice/p.pack:(+v.price||(p?p.price:0));
     if(!(qty>0)||!(price>0)) return toast('Quantity and price must be more than 0'), false;
     if(v.mode==='credit' && !v.cid) return toast('Choose a customer for Nkongole'), false;
     if(p && qty>p.qty && !confirm(`Only ${p.qty} in stock. Continue?`)) return false;
     const total=packs?r2(packs*packPrice):r2(qty*price), c=S.customers.find(x=>x.id===v.cid);
     const b=writeBatch(db);
-    b.set(doc(col('sales')),{t:Date.now(),item:p?p.name:(v.item||'Sale'),qty,price,total,mode:v.mode,cid:v.cid||'',cname:c?c.name:'',pid:p?p.id:'',cost:p?p.cost:0,packs,packPrice});
+    b.set(doc(col('sales')),{t:Date.now(),item:p?p.name:(v.item||'Sale'),qty,price,total,mode:v.mode,cid:v.cid||'',cname:c?c.name:'',pid:p?p.id:'',cost:p?p.cost:(+v.icost||0),packs,packPrice});
     if(p) b.update(docRef('products',p.id),{qty:inc(-qty)});
     if(v.mode==='credit') b.update(docRef('customers',v.cid),{owed:inc(total)});
     await b.commit(); toast('Sale saved');
@@ -374,9 +376,10 @@ function addSale(){
   chipify('f_mode'); chipify('f_unit'); stepify('f_qty');
   const sel=$('f_pid'); sel.insertAdjacentHTML('beforebegin','<input id="ps" placeholder="Type to search products">');
   const fill=t=>{ const m=S.products.filter(p=>p.name.toLowerCase().includes(t.toLowerCase()));
-    sel.innerHTML='<option value="">Other item (type below)</option>'+m.map(p=>`<option value="${p.id}">${esc(p.name)} (${p.qty} left)</option>`).join(''); if(t&&m.length){ sel.value=m[0].id; sel.onchange(); } };
+    sel.innerHTML='<option value="">Other item (type below)</option>'+m.map(p=>`<option value="${p.id}">${esc(p.name)} (${p.qty} left)</option>`).join(''); if(t&&m.length){ sel.value=m[0].id; sel.onchange(); } showCost(); };
   const setPrice=()=>{ const p=S.products.find(x=>x.id===sel.value); if(p) $('f_price').value=($('f_unit').value==='pack'&&p.pack>0)?r2(p.price*p.pack):p.price; };
-  sel.onchange=setPrice; $('f_unit').onchange=setPrice;
+  const showCost=()=>{ const on=!sel.value, el=$('f_icost'); el.style.display=on?'':'none'; el.previousElementSibling.style.display=on?'':'none'; };
+  sel.onchange=()=>{ setPrice(); showCost(); }; $('f_unit').onchange=setPrice; showCost();
   $('ps').oninput=()=>fill($('ps').value);
 }
 function addExpense(){
@@ -463,15 +466,16 @@ function render(){
   if(tab==='exp') h=perSel()+list(tExp.slice(0,shown),e=>`<div class="row"><div>${esc(e.what)}<small>${dstr(e.t)}</small></div><div><span class="amt neg">${K(e.amt)}</span> <button class="sec sm" aria-label="Delete expense" onclick="A.del('expenses','${e.id}')" aria-label="Delete"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>`,'No expenses yet.')+moreBtn(tExp.length)+fab('addExpense','Expense');
   if(tab==='stock') h=`<input id="q" placeholder="Search products" value="${esc(q)}" oninput="A.q(this.value)"><div id="lst">${pRows()}</div>`+fab('addProduct','Product');
   if(tab==='cust') h=`<input id="q" placeholder="Search customers" value="${esc(q)}" oninput="A.q(this.value)"><div id="lst">${cRows()}</div>`+fab('addCustomer','Customer');
-  if(tab==='more'){ const by={}, prod={}; tSales.forEach(x=>{by[x.mode||'cash']=(by[x.mode||'cash']||0)+x.total; prod[x.item]=(prod[x.item]||0)+x.total;});
+  if(tab==='more'){ const by={}, prod={}, pp={}; tSales.forEach(x=>{by[x.mode||'cash']=(by[x.mode||'cash']||0)+x.total; prod[x.item]=(prod[x.item]||0)+x.total; const o=pp[x.item]||(pp[x.item]={q:0,rev:0,pr:0}); o.q+=(+x.qty||0); o.rev+=x.total; o.pr+=x.total-cogs(x);});
     const cin=sum(tSales.filter(x=>x.mode!=='credit'),x=>x.total)+sum(S.payments.filter(inR),x=>x.amt);
     const rows=o=>Object.entries(o).sort((p,q)=>q[1]-p[1]).slice(0,6).map(([k,v])=>`<div class="row"><span>${esc(ML[k]||k)}</span><span class="amt">${K(v)}</span></div>`).join('')||'<div class="empty">Nothing yet.</div>';
     const I=p=>`<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
     const item=(fn,ic,t,sub)=>`<button class="mi" onclick="${fn}"><span class="mi-ic">${I(ic)}</span><span class="mi-t">${t}${sub?`<small>${sub}</small>`:''}</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>`;
+    const ppRows=Object.entries(pp).sort((a,b)=>isUnlocked()?b[1].pr-a[1].pr:b[1].q-a[1].q).slice(0,25).map(([n,o])=>`<div class="row"><span>${esc(n)}<small>${o.q} sold · Sales ${K(o.rev)}</small></span><span class="amt">${V(o.pr)}</span></div>`).join('')||'<div class="empty">Nothing yet.</div>';
     const nDel=Object.values(D).reduce((n,a)=>n+a.length,0);
     h=`${perSel()}<div class="grid"><div class="stat"><small>Sales</small><b>${K(sales)}</b></div><div class="stat"><small>Expenses</small><b>${V(exp)}</b></div>
     <div class="stat"><small>Profit</small><b>${V(sales-cg-exp)}</b></div><div class="stat"><small>Cash in − out</small><b>${V(cin-exp)}</b></div></div>
-    <h2>Sales by payment method</h2>${rows(by)}<h2>Top products</h2>${rows(prod)}
+    <h2>Sales by payment method</h2>${rows(by)}<h2>Products: sold and profit</h2>${ppRows}
     <p style="color:var(--mute);margin:4px 0 0;font-size:13px">Cash in = paid sales + Nkongole payments received. Subscription: K${PRICE}/month.</p>
     <h2>Business</h2><div class="mgroup">${item('A.setBiz()','<path d="M3 9l1-5h16l1 5M4 9v11h16V9M9 20v-6h6v6"/>','Business name',bizName?esc(bizName):'Shown on receipts')}${item('A.exportMenu()','<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>','Export to Excel','Sales, expenses, stock (CSV)')}${item('A.log()','<path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/>','Stock changes','History of edits and restocks')}${item('A.deleted()','<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>','Deleted entries',nDel+' item'+(nDel===1?'':'s')+' you can restore')}</div>
     <h2>Security</h2><div class="mgroup">${item('A.setPin()','<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>','App PIN',localStorage.getItem(pinKey())?'On · tap to turn off':'Lock this phone with 4 digits')}${item('A.setOwner()','<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>','Owner PIN',ownerHash?'On · tap to change or turn off':'Only you can edit or delete')}</div>
