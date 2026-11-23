@@ -110,7 +110,7 @@ service cloud.firestore {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid) && active(uid)
         && request.resource.data.keys().hasOnly(['t', 'item', 'qty', 'price', 'total', 'mode', 'cid', 'cname',
-             'pid', 'cost', 'packs', 'packPrice', 'ret', 'refOf', 'why', 'exWith', 'editOf', 'returnedQty'])
+             'pid', 'cost', 'packs', 'packPrice', 'ret', 'refOf', 'why', 'exWith', 'editOf', 'basket', 'returnedQty'])
         && request.resource.data.keys().hasAll(['t', 'item', 'qty', 'price', 'total', 'mode'])
         && timeOk(request.resource.data.t)
         && str(request.resource.data.item, 120)
@@ -123,6 +123,7 @@ service cloud.firestore {
         && optStr(request.resource.data, 'pid', 40) && optStr(request.resource.data, 'why', 300)
         && optStr(request.resource.data, 'refOf', 40) && optStr(request.resource.data, 'exWith', 40)
         && optStr(request.resource.data, 'editOf', 40)
+        && optStr(request.resource.data, 'basket', 40)
         && (
           (!('ret' in request.resource.data)
             && num(request.resource.data.qty, 1, 1000000)
